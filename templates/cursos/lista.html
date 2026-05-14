@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+
+{% block title %}Cursos {{ modalidad_label }}{% endblock %}
+
+{% block readonly_banner %}
+<div class="readonly-banner">
+    👁 Estás viendo el catálogo en <strong>modo solo lectura</strong>.
+    Los administradores pueden crear, editar y eliminar cursos.
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Modal nueva categoría — mismo estilo que el del form de cursos */
+    .cat-modal-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .cat-modal-backdrop.open { display: flex; }
+    .cat-modal-card {
+        background: white;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 480px;
+        padding: 28px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+    body.dark-mode .cat-modal-card {
+        background: #1e1e1e;
+        color: #e0e0e0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp; Cursos {{ modalidad_label }}
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+    <div>
+        <h2 class="page-title">Cursos y Categorías</h2>
+        <p class="page-subtitle">
+            Total {{ modalidad_label }}: {{ total_cursos }} curso{{ total_cursos|pluralize }}
+        </p>
+    </div>
+    {% if puede_editar_cursos %}
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn btn-secondary" id="btn-abrir-modal-cat"
+                style="background:#FFD700; color:#1a237e; border-color:#FFD700; font-weight:700;">
+            + Agregar categoría
+        </button>
+        <a href="{% url 'academia:curso_crear' %}?modalidad={{ modalidad }}" class="btn btn-success">
+            + Nuevo curso {{ modalidad_label|lower }}
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+{# ── Tabs Presencial / Online ──────────────────────── #}
+<div class="modalidad-tabs">
+    <a href="{% url 'academia:cursos_lista' modalidad='presencial' %}"
+       class="{% if modalidad == 'presencial' %}active{% endif %}">
+        🏫 Presencial
+        <span class="tab-count">{{ counts.presencial }}</span>
+    </a>
+    <a href="{% url 'academia:cursos_lista' modalidad='online' %}"
+       class="{% if modalidad == 'online' %}active{% endif %}">
+        🟢 Online
+        <span class="tab-count">{{ counts.online }}</span>
+    </a>
+</div>
+
+{% for cat in categorias %}
+    {% if cat.total > 0 %}
+    <div style="margin-top: 28px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+            <div style="width:6px; height:28px; background:{{ cat.obj.color }}; border-radius:3px;"></div>
+            <h3 style="font-size:18px; color:{{ cat.obj.color }}; font-weight:700;">
+                {{ cat.obj.nombre }}
+            </h3>
+            <span style="background:#f0f0f0; color:#555; padding:2px 10px; border-radius:12px; font-size:12px; font-weight:600;">
+                {{ cat.total }} curso{{ cat.total|pluralize }}
+            </span>
+            {% if puede_editar_cursos %}
+            <a href="{% url 'academia:curso_crear' %}?categoria={{ cat.obj.id }}&modalidad={{ modalidad }}"
+               class="btn btn-secondary btn-sm" style="margin-left:auto;">
+                + Agregar a {{ cat.obj.nombre }}
+            </a>
+            {% endif %}
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;">
+            {% for curso in cat.cursos %}
+                <div class="card-box" style="padding: 18px; border-left: 4px solid {{ cat.obj.color }}; {% if not curso.activo %}opacity:0.5;{% endif %}">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                        <h4 style="font-size:15px; color:#1a237e; margin-bottom:6px; flex:1;">
+                            {{ curso.nombre }}
+                            {% if not curso.activo %}<span style="color:#888; font-size:11px; font-weight:400;">(inactivo)</span>{% endif %}
+                        </h4>
+                        <span style="font-size:14px; font-weight:700; color:#2e7d32; white-space:nowrap;">
+                            {% if modalidad == 'online' %}
+                                ${{ curso.valor_online }}
+                            {% else %}
+                                ${{ curso.valor_presencial }}
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    {# Etiquetas de modalidad (solo mostramos la que corresponde a la vista actual) #}
+                    <div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px;">
+                        {% if modalidad == 'presencial' and curso.ofrece_presencial %}
+                            <span class="badge badge-presencial" style="font-size:10px;">
+                                Presencial ${{ curso.valor_presencial }}
+                            </span>
+                        {% elif modalidad == 'online' and curso.ofrece_online %}
+                            <span class="badge badge-online" style="font-size:10px;">
+                                Online ${{ curso.valor_online }}
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    {% if curso.duracion %}
+                        <p style="font-size:12px; color:#888; margin-bottom:8px;">⏱ {{ curso.duracion }}</p>
+                    {% endif %}
+                    {% if curso.descripcion %}
+                        <p style="font-size:12px; color:#666; line-height:1.4; margin-bottom:10px;">{{ curso.descripcion|truncatewords:18 }}</p>
+                    {% endif %}
+
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
+                        {% if puede_editar_cursos %}
+                            <a href="{% url 'academia:curso_jornadas' curso.pk %}?modalidad={{ modalidad }}"
+                               class="btn btn-secondary btn-sm">
+                                Jornadas ({% if modalidad == 'online' %}{{ curso.jornadas_online_count }}{% else %}{{ curso.jornadas_presencial_count }}{% endif %})
+                            </a>
+                            <a href="{% url 'academia:curso_editar' curso.pk %}"
+                               class="btn btn-warning btn-sm">Editar</a>
+                            <form method="post" action="{% url 'academia:curso_eliminar' curso.pk %}"
+                                  style="display:inline;"
+                                  onsubmit="return false;">
+                                {% csrf_token %}
+                                <button type="button" class="btn btn-danger btn-sm"
+                                    onclick="confirmarAccion(this.closest('form'), '¿Eliminar el curso «{{ curso.nombre|escapejs }}»? Si tiene matrículas, se marcará como inactivo.', 'danger')">Eliminar</button>
+                            </form>
+                        {% else %}
+                            {# Asesores: solo ven cuántas jornadas hay, sin enlace #}
+                            <span class="btn btn-secondary btn-sm" style="cursor:default; opacity:0.7;">
+                                {% if modalidad == 'online' %}{{ curso.jornadas_online_count }}{% else %}{{ curso.jornadas_presencial_count }}{% endif %} jornada(s)
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+{% empty %}
+    <div class="empty-state">
+        <p>No hay categorías. La migración inicial debería haber creado tres por defecto.</p>
+    </div>
+{% endfor %}
+
+{% if total_cursos == 0 %}
+<div class="empty-state" style="margin-top: 28px; padding: 40px; background:white; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+    <p style="font-size:15px; margin-bottom:8px;">No hay cursos {{ modalidad_label|lower }} todavía.</p>
+    {% if puede_editar_cursos %}
+        <p style="font-size:13px; color:#aaa; margin-bottom:16px;">
+            Crea uno nuevo, o edita un curso existente y marca la modalidad <strong>{{ modalidad_label|lower }}</strong>.
+        </p>
+        <a href="{% url 'academia:curso_crear' %}?modalidad={{ modalidad }}" class="btn btn-primary">
+            + Crear primer curso {{ modalidad_label|lower }}
+        </a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if sin_categoria %}
+<div style="margin-top: 28px;">
+    <h3 style="font-size:16px; color:#888; margin-bottom:12px;">⚠️ Cursos sin categoría</h3>
+    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;">
+        {% for curso in sin_categoria %}
+            <div class="card-box" style="padding: 18px; border-left: 4px solid #888;">
+                <h4 style="font-size:15px; color:#1a237e;">{{ curso.nombre }}</h4>
+                {% if puede_editar_cursos %}
+                <a href="{% url 'academia:curso_editar' curso.pk %}" class="btn btn-warning btn-sm" style="margin-top:8px;">Asignar categoría</a>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{# ── Modal: agregar nueva categoría ── #}
+{% if puede_editar_cursos %}
+<div class="cat-modal-backdrop" id="modal-cat">
+    <div class="cat-modal-card">
+        <h3 style="color:#1a237e; margin-bottom:16px; font-size:18px;">Nueva categoría</h3>
+        <p style="font-size:13px; color:#666; margin-bottom:16px;">
+            Las categorías agrupan los cursos. Por ejemplo: <em>Empresariales</em>, <em>Técnico</em>, <em>Vacacionales</em>.
+        </p>
+
+        <div id="cat-modal-error" style="display:none;" class="flash flash-error"></div>
+
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+                <label class="form-label">Nombre *</label>
+                <input type="text" id="cat-modal-nombre" class="form-input"
+                       placeholder="Ej.: Vacacionales" autocomplete="off">
+            </div>
+            <div>
+                <label class="form-label">Descripción</label>
+                <textarea id="cat-modal-descripcion" class="form-input" rows="2"
+                          placeholder="Opcional: descripción interna de la categoría"></textarea>
+            </div>
+            <div>
+                <label class="form-label">Color</label>
+                <select id="cat-modal-color" class="form-input">
+                    <option value="#1a237e">Azul</option>
+                    <option value="#2e7d32">Verde</option>
+                    <option value="#c62828">Rojo</option>
+                    <option value="#f0ad4e">Naranja</option>
+                    <option value="#6a1b9a">Morado</option>
+                    <option value="#00838f">Cian</option>
+                    <option value="#5d4037">Marrón</option>
+                    <option value="#455a64">Gris</option>
+                </select>
+                <small style="color:#888; font-size:11px;">
+                    El color se usa para identificar visualmente la categoría en las tarjetas de cursos.
+                </small>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
+            <button type="button" class="btn btn-secondary" id="btn-cancelar-cat">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="btn-guardar-cat">Guardar</button>
+        </div>
+    </div>
+</div>
+{% csrf_token %}
+{% endif %}
+{% endblock %}
+
+
+{% block extra_js %}
+{% if puede_editar_cursos %}
+<script>
+(function() {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const modal = document.getElementById('modal-cat');
+    const btnAbrir = document.getElementById('btn-abrir-modal-cat');
+    const btnCancelar = document.getElementById('btn-cancelar-cat');
+    const btnGuardar = document.getElementById('btn-guardar-cat');
+    const inputNombre = document.getElementById('cat-modal-nombre');
+    const inputDescripcion = document.getElementById('cat-modal-descripcion');
+    const inputColor = document.getElementById('cat-modal-color');
+    const errorBox = document.getElementById('cat-modal-error');
+
+    function abrirModal() {
+        errorBox.style.display = 'none';
+        inputNombre.value = '';
+        inputDescripcion.value = '';
+        inputColor.value = '#1a237e';
+        btnGuardar.disabled = false;
+        btnGuardar.textContent = 'Guardar';
+        modal.classList.add('open');
+        setTimeout(() => inputNombre.focus(), 100);
+    }
+    function cerrarModal() {
+        modal.classList.remove('open');
+    }
+
+    btnAbrir.addEventListener('click', abrirModal);
+    btnCancelar.addEventListener('click', cerrarModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) cerrarModal(); });
+
+    btnGuardar.addEventListener('click', async function() {
+        errorBox.style.display = 'none';
+        const nombre = inputNombre.value.trim();
+        if (!nombre) {
+            errorBox.textContent = 'El nombre es obligatorio.';
+            errorBox.style.display = 'block';
+            inputNombre.focus();
+            return;
+        }
+        this.disabled = true;
+        this.textContent = 'Guardando…';
+
+        try {
+            const resp = await fetch('{% url "academia:api_categoria_crear" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: JSON.stringify({
+                    nombre: nombre,
+                    descripcion: inputDescripcion.value.trim(),
+                    color: inputColor.value,
+                }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                errorBox.textContent = data.error || 'No se pudo crear la categoría.';
+                errorBox.style.display = 'block';
+                this.disabled = false;
+                this.textContent = 'Guardar';
+                return;
+            }
+            // Categoría creada → recargamos para mostrarla en la lista
+            window.location.reload();
+        } catch (err) {
+            errorBox.textContent = 'Error de conexión: ' + err.message;
+            errorBox.style.display = 'block';
+            this.disabled = false;
+            this.textContent = 'Guardar';
+        }
+    });
+
+    // Atajos: Enter guarda, Escape cierra
+    document.addEventListener('keydown', (e) => {
+        if (!modal.classList.contains('open')) return;
+        if (e.key === 'Escape') {
+            cerrarModal();
+        } else if (e.key === 'Enter' && document.activeElement !== inputDescripcion) {
+            // Enter en cualquier input que no sea el textarea, dispara guardar
+            e.preventDefault();
+            btnGuardar.click();
+        }
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

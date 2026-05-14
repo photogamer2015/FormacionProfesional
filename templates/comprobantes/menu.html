@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Comprobantes — Formación Profesional EC{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp; Comprobantes
+</div>
+
+<h2 class="page-title">🧾 Comprobantes</h2>
+<p class="page-subtitle">
+    Consultar el ranking de asesoras.
+</p>
+
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:24px;">
+    
+    <div class="card-box" style="border-top:4px solid #1a237e; padding:16px;">
+        <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">FACTURADO</div>
+        <div style="font-size:22px; font-weight:700; color:#1a237e; margin-top:4px;">${{ total_facturado|floatformat:2 }}</div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">{{ total_comprobantes }} comprobante{{ total_comprobantes|pluralize }}</div>
+    </div>
+
+    <div class="card-box" style="border-top:4px solid #2e7d32; padding:16px;">
+        <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">COBRADO</div>
+        <div style="font-size:22px; font-weight:700; color:#2e7d32; margin-top:4px;">${{ total_ventas|floatformat:2 }}</div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">Ingresos efectivos</div>
+    </div>
+
+    <div class="card-box" style="border-top:4px solid #c62828; padding:16px;">
+        <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">POR COBRAR</div>
+        <div style="font-size:22px; font-weight:700; color:#c62828; margin-top:4px;">${{ total_pendiente|floatformat:2 }}</div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">Diferencia pendiente</div>
+    </div>
+
+</div>
+
+<hr style="margin: 16px 0 28px; border: none; border-top: 1px solid #e0e0e0;">
+
+{# ── Mini menú ── #}
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px;">
+    <a href="{% url 'academia:comprobante_registrar' %}" style="text-decoration:none;">
+        <div class="card-box" style="border-left: 4px solid #2e7d32; cursor:pointer; transition: transform 0.15s;"
+             onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="font-size:32px; margin-bottom:8px;">＋</div>
+            <h3 style="color:#1a237e; font-size:17px; margin-bottom:6px;">Registrar Comprobante</h3>
+            <p style="color:#666; font-size:13px;">
+                Crear una nueva venta con datos del curso, cliente, pago/abono
+                y datos de facturación.
+            </p>
+        </div>
+    </a>
+
+    <a href="{% url 'academia:comprobante_totales' %}" style="text-decoration:none;">
+        <div class="card-box" style="border-left: 4px solid #FFD700; cursor:pointer; transition: transform 0.15s;"
+            onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="font-size:32px; margin-bottom:8px;">🏆</div>
+            <h3 style="color:#1a237e; font-size:17px; margin-bottom:6px;">Totales de Venta</h3>
+            <p style="color:#666; font-size:13px;">
+                Ranking de asesoras: cuántas ventas hizo cada una y el monto total.
+                Compara el desempeño del equipo.
+            </p>
+        </div>
+    </a>
+
+    <a href="{% url 'academia:comprobante_lista' %}" style="text-decoration:none;">
+        <div class="card-box" style="border-left: 4px solid #1a237e; cursor:pointer; transition: transform 0.15s;"
+             onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="font-size:32px; margin-bottom:8px;">≡</div>
+            <h3 style="color:#1a237e; font-size:17px; margin-bottom:6px;">Lista de Comprobantes</h3>
+            <p style="color:#666; font-size:13px;">
+                Ver todos los comprobantes con filtros por curso, modalidad,
+                vendedora y estado de factura.
+            </p>
+        </div>
+    </a>
+</div>
+{% endblock %}

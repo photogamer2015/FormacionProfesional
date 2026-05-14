@@ -1,0 +1,361 @@
+{% extends 'base.html' %}
+
+{% block title %}Jornadas — {{ curso.nombre }}{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:cursos_lista' modalidad=modalidad_activa %}">Cursos</a> &nbsp;›&nbsp;
+    {{ curso.nombre }} &nbsp;›&nbsp; Jornadas
+</div>
+
+<h2 class="page-title">{{ curso.nombre }}</h2>
+<p class="page-subtitle">
+    {% if curso.categoria %}
+    <span
+        style="background:{{ curso.categoria.color }}; color:white; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:600;">
+        {{ curso.categoria.nombre }}
+    </span>
+    {% endif %}
+    {% if modalidad_activa == 'presencial' and curso.ofrece_presencial %}
+    <span class="badge badge-presencial">Presencial ${{ curso.valor_presencial }}</span>
+    {% elif modalidad_activa == 'online' and curso.ofrece_online %}
+    <span class="badge badge-online">Online ${{ curso.valor_online }}</span>
+    {% endif %}
+</p>
+
+<div style="display:grid; grid-template-columns: 1fr 2fr; gap: 24px; align-items:start;">
+
+    {# ── Panel izquierdo: Agregar nueva jornada ─────────── #}
+    <div class="card-box">
+        <h3 style="color:#1a237e; margin-bottom:12px; font-size:17px;">+ Nueva jornada</h3>
+        <form method="post" style="display:flex; flex-direction:column; gap:12px;">
+            {% csrf_token %}
+            <div>
+                <label class="form-label">Modalidad *</label>
+                {{ form.modalidad }}
+                {{ form.modalidad.errors }}
+            </div>
+            <div>
+                <label class="form-label">Descripción *</label>
+                {{ form.descripcion }}
+                {{ form.descripcion.errors }}
+            </div>
+            <div>
+                <label class="form-label">Fecha de inicio *</label>
+                {{ form.fecha_inicio }}
+                {{ form.fecha_inicio.errors }}
+            </div>
+            <div>
+                <label class="form-label" id="label-ciudad">Ciudad *</label>
+                {{ form.ciudad }}
+                {{ form.ciudad.errors }}
+            </div>
+            <div>
+                <label style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                    {{ form.activo }} Activo
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary">Agregar jornada</button>
+        </form>
+    </div>
+
+    {# ── Panel derecho: Listado de jornadas ─────────────── #}
+    <div>
+        {% if modalidad_activa == 'presencial' %}
+        {# ── Jornadas presenciales ─────────────────────── #}
+        <div style="margin-bottom:20px;">
+            <h3 style="color:#1a237e; font-size:15px; margin-bottom:10px;">
+                🏫 Jornadas Presenciales
+                <span
+                    style="background:#e3f2fd; color:#0d47a1; padding:2px 8px; border-radius:10px; font-size:11px; margin-left:6px;">
+                    {{ jornadas_presencial|length }}
+                </span>
+            </h3>
+            <div class="table-wrap">
+                {% if jornadas_presencial %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Descripción</th>
+                            <th>Fecha</th>
+                            <th>Ciudad</th>
+                            <th>Estado</th>
+                            <th>Mat.</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for j in jornadas_presencial %}
+                        <tr>
+                            <td><strong>{{ j.descripcion_legible }}</strong></td>
+                            <td>{{ j.fecha_inicio|date:"d/m/Y" }}</td>
+                            <td>{{ j.ciudad|default:'—' }}</td>
+                            <td>
+                                {% if j.activo %}
+                                <span class="badge badge-pagado">Activa</span>
+                                {% else %}
+                                <span class="badge badge-pendiente">Inactiva</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ j.matriculas.count }}</td>
+                            <td>
+                                <div class="row-actions">
+                                    <button type="button" class="btn btn-warning btn-sm"
+                                        onclick="abrirModalEditar('{% url 'academia:jornada_editar' curso.pk j.pk %}', '{{ modalidad_activa }}')">
+                                        Editar
+                                    </button>
+                                    <form method="post" action="{% url 'academia:jornada_eliminar' curso.pk j.pk %}"
+                                        onsubmit="return false;">
+                                        {% csrf_token %}
+                                        <button type="button" class="btn btn-danger btn-sm"
+                                            onclick="confirmarAccion(this.closest('form'), '¿Eliminar esta jornada? Si tiene matrículas, se marcará como inactiva.', 'danger')">Eliminar</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state" style="padding:20px;">
+                    <p style="font-size:13px; color:#888;">Sin jornadas presenciales aún.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if modalidad_activa == 'online' %}
+        {# ── Jornadas online ───────────────────────────── #}
+        <div>
+            <h3 style="color:#2e7d32; font-size:15px; margin-bottom:10px;">
+                🟢 Jornadas Online
+                <span
+                    style="background:#e8f5e9; color:#2e7d32; padding:2px 8px; border-radius:10px; font-size:11px; margin-left:6px;">
+                    {{ jornadas_online|length }}
+                </span>
+            </h3>
+            <div class="table-wrap">
+                {% if jornadas_online %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Descripción</th>
+                            <th>Fecha</th>
+                            <th>Ciudad</th>
+                            <th>Estado</th>
+                            <th>Mat.</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for j in jornadas_online %}
+                        <tr>
+                            <td><strong>{{ j.descripcion_legible }}</strong></td>
+                            <td>{{ j.fecha_inicio|date:"d/m/Y" }}</td>
+                            <td>{{ j.ciudad|default:'—' }}</td>
+                            <td>
+                                {% if j.activo %}
+                                <span class="badge badge-pagado">Activa</span>
+                                {% else %}
+                                <span class="badge badge-pendiente">Inactiva</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ j.matriculas.count }}</td>
+                            <td>
+                                <div class="row-actions">
+                                    <button type="button" class="btn btn-warning btn-sm"
+                                        onclick="abrirModalEditar('{% url 'academia:jornada_editar' curso.pk j.pk %}', '{{ modalidad_activa }}')">
+                                        Editar
+                                    </button>
+                                    <form method="post" action="{% url 'academia:jornada_eliminar' curso.pk j.pk %}"
+                                        onsubmit="return false;">
+                                        {% csrf_token %}
+                                        <button type="button" class="btn btn-danger btn-sm"
+                                            onclick="confirmarAccion(this.closest('form'), '¿Eliminar esta jornada? Si tiene matrículas, se marcará como inactiva.', 'danger')">Eliminar</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state" style="padding:20px;">
+                    <p style="font-size:13px; color:#888;">Sin jornadas online aún.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<div style="margin-top: 20px;">
+    <a href="{% url 'academia:cursos_lista' modalidad=modalidad_activa %}" class="btn btn-secondary">‹ Volver a
+        cursos</a>
+</div>
+
+{# ── MODAL DE EDICIÓN DE JORNADA ────────────────────────────── #}
+<div id="modal-editar-jornada" style="
+    display:none; position:fixed; inset:0; z-index:1000;
+    background:rgba(0,0,0,0.52); backdrop-filter:blur(3px);
+    align-items:center; justify-content:center; padding:20px;">
+    <div style="
+        background:white; border-radius:16px; width:100%; max-width:480px;
+        box-shadow:0 20px 60px rgba(0,0,0,0.25); padding:28px;
+        animation: slideUpModal 0.25s cubic-bezier(0.34,1.56,0.64,1);">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="color:#1a237e; font-size:18px; margin:0; font-weight:700;">✏️ Editar Jornada</h3>
+            <button onclick="cerrarModalEditar()" style="
+                background:none; border:none; font-size:24px; cursor:pointer;
+                color:#aaa; line-height:1; padding:0 4px; transition:color 0.15s;"
+                onmouseover="this.style.color='#333'" onmouseout="this.style.color='#aaa'">×</button>
+        </div>
+
+        <form id="form-editar-jornada" method="post" style="display:flex; flex-direction:column; gap:14px;">
+            {% csrf_token %}
+            <input type="hidden" name="modalidad_activa" id="edit-modalidad-activa">
+
+            <div>
+                <label class="form-label">Modalidad *</label>
+                <select name="modalidad" id="edit-modalidad" class="form-input">
+                    <option value="presencial">Presencial</option>
+                    <option value="online">Online</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label">Descripción *</label>
+                <select name="descripcion" id="edit-descripcion" class="form-input">
+                    <option value="">— Selecciona los días —</option>
+                    {% for val, label in form.fields.descripcion.choices %}
+                    {% if val %}<option value="{{ val }}">{{ label }}</option>{% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label">Fecha de inicio *</label>
+                <input type="date" name="fecha_inicio" id="edit-fecha-inicio" class="form-input">
+            </div>
+
+            <div>
+                <label class="form-label" id="edit-label-ciudad">Ciudad *</label>
+                <select name="ciudad" id="edit-ciudad" class="form-input">
+                    <option value="">— Selecciona ciudad —</option>
+                    <option value="Guayaquil">Guayaquil</option>
+                    <option value="Quito">Quito</option>
+                </select>
+            </div>
+
+            <div>
+                <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                    <input type="checkbox" name="activo" id="edit-activo"
+                        style="accent-color:#1a237e; width:16px; height:16px;">
+                    Activo
+                </label>
+            </div>
+
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:6px;">
+                <button type="button" onclick="cerrarModalEditar()" class="btn btn-secondary">Cancelar</button>
+                <button type="submit" class="btn btn-primary">💾 Guardar cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    /* Modo oscuro para el modal de edición */
+    body.dark-mode #modal-editar-jornada>div {
+        background: #1e1e1e;
+        border: 1px solid #333;
+    }
+
+    body.dark-mode #modal-editar-jornada h3 {
+        color: #90caf9 !important;
+    }
+
+    body.dark-mode #edit-label-ciudad {
+        color: #aaa !important;
+    }
+
+    body.dark-mode #modal-editar-jornada select,
+    body.dark-mode #modal-editar-jornada input[type="date"] {
+        background: #2c2c2c;
+        color: #fff;
+        border-color: #444;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ── Label ciudad en form de nueva jornada ─────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        const modalidadSelect = document.querySelector('select[name="modalidad"]');
+        const labelCiudad = document.getElementById('label-ciudad');
+
+        function toggleCiudadRequired() {
+            if (modalidadSelect && modalidadSelect.value === 'online') {
+                labelCiudad.textContent = 'Ciudad (Opcional)';
+            } else {
+                labelCiudad.textContent = 'Ciudad *';
+            }
+        }
+        if (modalidadSelect) {
+            modalidadSelect.addEventListener('change', toggleCiudadRequired);
+            toggleCiudadRequired();
+        }
+
+        // Cerrar modal al hacer clic en el fondo
+        document.getElementById('modal-editar-jornada').addEventListener('click', function (e) {
+            if (e.target === this) cerrarModalEditar();
+        });
+
+        // Actualizar label ciudad cuando cambia modalidad dentro del modal
+        document.getElementById('edit-modalidad').addEventListener('change', actualizarLabelCiudadModal);
+    });
+
+    // ── Modal de edición de jornada ───────────────────────────────────
+    function abrirModalEditar(url, modalidadActiva) {
+        document.getElementById('edit-modalidad-activa').value = modalidadActiva;
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ok) return;
+                const j = data.jornada;
+
+                document.getElementById('form-editar-jornada').action = url;
+                document.getElementById('edit-modalidad').value = j.modalidad;
+                document.getElementById('edit-descripcion').value = j.descripcion;
+                document.getElementById('edit-fecha-inicio').value = j.fecha_inicio;
+                document.getElementById('edit-ciudad').value = j.ciudad;
+                document.getElementById('edit-activo').checked = j.activo;
+
+                actualizarLabelCiudadModal();
+
+                const modal = document.getElementById('modal-editar-jornada');
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            })
+            .catch(() => alert('No se pudieron cargar los datos de la jornada.'));
+    }
+
+    function cerrarModalEditar() {
+        document.getElementById('modal-editar-jornada').style.display = 'none';
+        document.body.style.overflow = '';
+    }
+
+    function actualizarLabelCiudadModal() {
+        const val = document.getElementById('edit-modalidad').value;
+        document.getElementById('edit-label-ciudad').textContent =
+            val === 'online' ? 'Ciudad (Opcional)' : 'Ciudad *';
+    }
+</script>
+{% endblock %}

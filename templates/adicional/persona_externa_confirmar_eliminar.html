@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar persona externa{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:personas_externas_lista' %}">Personas Externas</a> &nbsp;›&nbsp; Eliminar
+</div>
+
+<div class="card-box" style="max-width:520px; padding:28px; margin-top:14px;">
+    <h2 style="color:#c62828; font-size:18px;">⚠ Confirmar eliminación</h2>
+    <p style="margin-top:10px;">
+        ¿Estás seguro que deseas eliminar a esta persona externa?
+    </p>
+    <div style="background:#fff8e1; border-left:4px solid #f0ad4e; padding:14px; border-radius:8px; margin-top:14px;">
+        <div style="font-weight:600;">{{ persona.nombre_completo }}</div>
+        <div style="font-size:13px; color:#666; margin-top:4px;">
+            Cédula: {{ persona.cedula }}
+            {% if persona.celular %} · 📱 {{ persona.celular }}{% endif %}
+        </div>
+    </div>
+
+    <form method="post" style="margin-top:20px; display:flex; gap:8px; justify-content:flex-end;">
+        {% csrf_token %}
+        <a href="{% url 'academia:personas_externas_lista' %}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-danger">🗑 Eliminar definitivamente</button>
+    </form>
+</div>
+{% endblock %}

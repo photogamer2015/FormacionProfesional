@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}Marcar Examen Supletorio{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:matricula_abonos' matricula.pk %}">{{ matricula.estudiante.nombre_completo }}</a> &nbsp;›&nbsp;
+    Examen Supletorio
+</div>
+
+<h2 class="page-title">📝 Marcar Examen Supletorio</h2>
+<p class="page-subtitle">
+    Esto registra un cobro <strong>adicional</strong> que aparecerá en la sección
+    <a href="{% url 'academia:adicional_menu' %}" style="color:#1a237e; font-weight:600;">Adicional</a>.
+    Tú defines el valor.
+</p>
+
+<div class="card-box" style="max-width:680px; padding:24px; margin-top:14px;">
+    <div style="background:#fff8e1; border-left:4px solid #f0ad4e; padding:14px; border-radius:8px; margin-bottom:18px;">
+        <div style="font-weight:600; color:#1a237e; font-size:15px;">{{ matricula.estudiante.nombre_completo }}</div>
+        <div style="font-size:13px; color:#666; margin-top:4px;">
+            Cédula: {{ matricula.estudiante.cedula }} ·
+            {{ matricula.curso.nombre }}
+            ({{ matricula.get_modalidad_display }})
+        </div>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="form-grid">
+            <div>
+                <label class="form-label">{{ form.numero_modulo.label }}</label>
+                {{ form.numero_modulo }}
+                {{ form.numero_modulo.errors }}
+            </div>
+            <div>
+                <label class="form-label">{{ form.fecha.label }}</label>
+                {{ form.fecha }}
+                {{ form.fecha.errors }}
+            </div>
+            <div>
+                <label class="form-label">{{ form.valor.label }}</label>
+                {{ form.valor }}
+                {{ form.valor.errors }}
+                <small style="color:#888; font-size:11px;">Tú decides el valor del supletorio.</small>
+            </div>
+            <div>
+                <label class="form-label">{{ form.metodo_pago.label }}</label>
+                {{ form.metodo_pago }}
+                {{ form.metodo_pago.errors }}
+            </div>
+            <div id="bloque-banco" style="display:none; grid-column: span 1; background:#f5f7ff; border:1px solid #c5cae9; border-radius:8px; padding:12px;">
+                <label class="form-label" style="color:#1a237e;">🏦 Banco *</label>
+                {{ form.banco }}
+                {{ form.banco.errors }}
+            </div>
+            <div>
+                <label class="form-label">
+                    {{ form.numero_recibo.label }}
+                    <span style="color:#888; font-weight:400; font-size:11px;">(auto: <strong>ADC-XXXX</strong>)</span>
+                </label>
+                {{ form.numero_recibo }}
+                {{ form.numero_recibo.errors }}
+            </div>
+        </div>
+
+        <div style="margin-top:14px;">
+            <label class="form-label">{{ form.observaciones.label }}</label>
+            {{ form.observaciones }}
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:22px;">
+            <a href="{% url 'academia:matricula_abonos' matricula.pk %}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary" style="background:#1a237e;">
+                📝 Registrar examen supletorio
+            </button>
+        </div>
+    </form>
+</div>
+
+{% block extra_js %}
+<script>
+    (function () {
+        const metodoSel = document.getElementById('id_metodo_pago');
+        const bloqueBanco = document.getElementById('bloque-banco');
+        if (!metodoSel || !bloqueBanco) return;
+
+        function actualizar() {
+            const bancoSel = document.getElementById('id_banco');
+            const labelBanco = bloqueBanco.querySelector('label');
+
+            if (metodoSel.value === 'transferencia') {
+                bloqueBanco.style.display = 'block';
+                if (labelBanco) labelBanco.innerText = '🏦 Banco *';
+                if (bancoSel) {
+                    Array.from(bancoSel.options).forEach(opt => {
+                        if (opt.value === 'payphone') {
+                            opt.style.display = 'none';
+                        } else {
+                            opt.style.display = '';
+                        }
+                    });
+                    if (bancoSel.value === 'payphone') bancoSel.value = '';
+                }
+            } else if (metodoSel.value === 'tarjeta') {
+                bloqueBanco.style.display = 'block';
+                if (labelBanco) labelBanco.innerText = '💳 Tarjeta / App *';
+                if (bancoSel) {
+                    Array.from(bancoSel.options).forEach(opt => {
+                        if (opt.value === 'payphone' || opt.value === '') {
+                            opt.style.display = '';
+                        } else {
+                            opt.style.display = 'none';
+                        }
+                    });
+                    if (bancoSel.value !== 'payphone') bancoSel.value = 'payphone';
+                }
+            } else {
+                bloqueBanco.style.display = 'none';
+                if (bancoSel) bancoSel.value = '';
+            }
+        }
+        metodoSel.addEventListener('change', actualizar);
+        actualizar();
+    })();
+</script>
+{% endblock %}
+{% endblock %}

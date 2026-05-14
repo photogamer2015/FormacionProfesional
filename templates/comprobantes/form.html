@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:comprobante_menu' %}">Comprobantes</a> &nbsp;›&nbsp;
+    {% if modo == 'editar' %}Editar #{{ comprobante.pk }}{% else %}Registrar{% endif %}
+</div>
+
+<h2 class="page-title">
+    {% if modo == 'editar' %}✏️ Editar Comprobante #{{ comprobante.pk }}{% else %}🧾 Registrar Comprobante{% endif %}
+</h2>
+<p class="page-subtitle">
+    Completa <strong>todos</strong> los campos. Todos son obligatorios.
+</p>
+
+{% if form.non_field_errors %}
+    <div class="flash flash-error">
+        {{ form.non_field_errors }}
+    </div>
+{% endif %}
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="card-box" style="margin-bottom: 20px;">
+        <h3 class="form-section-title">📚 Datos del curso</h3>
+
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="{{ form.curso.id_for_label }}">
+                    Curso <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.curso }}
+                {{ form.curso.errors }}
+            </div>
+
+            <div>
+                <label class="form-label" for="{{ form.modalidad.id_for_label }}">
+                    Modalidad <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.modalidad }}
+                {{ form.modalidad.errors }}
+            </div>
+
+            <div>
+                <label class="form-label" for="{{ form.fecha_inscripcion.id_for_label }}">
+                    Fecha de inscripción <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.fecha_inscripcion }}
+                {{ form.fecha_inscripcion.errors }}
+            </div>
+
+            <div>
+                <label class="form-label" for="{{ form.jornada.id_for_label }}">
+                    Jornada <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.jornada }}
+                {{ form.jornada.errors }}
+            </div>
+
+            <div>
+                <label class="form-label" for="{{ form.inicio_curso.id_for_label }}">
+                    Inicio del curso <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.inicio_curso }}
+                {{ form.inicio_curso.errors }}
+            </div>
+        </div>
+    </div>
+
+    <div class="card-box" style="margin-bottom: 20px;">
+        <h3 class="form-section-title">👤 Datos del cliente</h3>
+
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="{{ form.nombre_persona.id_for_label }}">
+                    Nombre de la persona <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.nombre_persona }}
+                {{ form.nombre_persona.errors }}
+            </div>
+
+            <div>
+                <label class="form-label" for="{{ form.celular.id_for_label }}">
+                    Celular <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.celular }}
+                {{ form.celular.errors }}
+            </div>
+        </div>
+    </div>
+
+    <div class="card-box" style="margin-bottom: 20px;">
+        <h3 class="form-section-title">💰 Pago</h3>
+
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="{{ form.pago_abono.id_for_label }}">
+                    Pago o abono (USD) <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.pago_abono }}
+                {{ form.pago_abono.errors }}
+            </div>
+
+            <div>
+                <label class="form-label" for="{{ form.diferencia.id_for_label }}">
+                    Diferencia (USD) <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.diferencia }}
+                {{ form.diferencia.errors }}
+            </div>
+        </div>
+
+        <div style="margin-top: 14px;">
+            <label class="form-label" for="{{ form.link_comprobante.id_for_label }}">
+                📎 Link del comprobante
+                <span style="color:#888; font-weight:400; font-size:11px;">(opcional)</span>
+            </label>
+            {{ form.link_comprobante }}
+            {{ form.link_comprobante.errors }}
+            <small style="color:#888; font-size:11px;">
+                Si tienes la foto del comprobante en Drive / Imgur / WhatsApp Web, pega el enlace aquí.
+            </small>
+            <div>
+                <label class="form-label" for="{{ form.tipo_registro.id_for_label }}">
+                    Tipo de registro <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.tipo_registro }}
+                {{ form.tipo_registro.errors }}
+            </div>
+        </div>
+    </div>
+
+    <div class="card-box" style="margin-bottom: 20px;">
+        <h3 class="form-section-title">🛍️ Vendedora</h3>
+
+        <div style="background: #e3f2fd; border-left: 4px solid #1a237e; padding: 12px 14px; border-radius: 6px;">
+            <div style="font-size: 12px; color:#666;">Vendedora (auto-asignada)</div>
+            <div style="font-size: 16px; font-weight: 700; color: #1a237e; margin-top: 4px;">
+                {{ usuario_vendedora|default:"—" }}
+            </div>
+            <div style="font-size: 12px; color:#666; margin-top: 6px;">
+                Esta venta queda registrada con tu usuario.
+            </div>
+        </div>
+    </div>
+
+    <div class="card-box" style="margin-bottom: 20px;">
+        <h3 class="form-section-title">🧾 Factura</h3>
+
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="{{ form.factura_realizada.id_for_label }}">
+                    ¿Factura realizada? <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.factura_realizada }}
+                {{ form.factura_realizada.errors }}
+            </div>
+        </div>
+
+        <h4 style="font-size: 14px; color: #1a237e; font-weight: 600; margin: 20px 0 12px;">
+            Datos para factura
+        </h4>
+
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="{{ form.fact_nombres.id_for_label }}">
+                    Nombres <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.fact_nombres }}
+                {{ form.fact_nombres.errors }}
+            </div>
+
+            <div>
+                <label class="form-label" for="{{ form.fact_apellidos.id_for_label }}">
+                    Apellidos <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.fact_apellidos }}
+                {{ form.fact_apellidos.errors }}
+            </div>
+
+            <div>
+                <label class="form-label" for="{{ form.fact_cedula.id_for_label }}">
+                    Número de cédula <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.fact_cedula }}
+                {{ form.fact_cedula.errors }}
+            </div>
+
+            <div>
+                <label class="form-label" for="{{ form.fact_correo.id_for_label }}">
+                    Correo electrónico <span style="color:#c62828;">*</span>
+                </label>
+                {{ form.fact_correo }}
+                {{ form.fact_correo.errors }}
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 24px;">
+        <button type="submit" class="btn btn-primary">
+            {% if modo == 'editar' %}💾 Guardar cambios{% else %}＋ Registrar comprobante{% endif %}
+        </button>
+        <a href="{% url 'academia:comprobante_lista' %}" class="btn btn-secondary">Cancelar</a>
+    </div>
+
+</form>
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+
+{% block title %}Lista de Adicionales{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:adicional_menu' %}">Adicional</a> &nbsp;›&nbsp; Lista
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:18px;">
+    <div>
+        <h2 class="page-title">≡ Lista de Adicionales</h2>
+        <p class="page-subtitle">
+            {{ count }} registro{{ count|pluralize }} ·
+            Total: <strong style="color:#2e7d32;">${{ total_filtrado|floatformat:2 }}</strong>
+        </p>
+    </div>
+    <div style="display:flex; gap:8px;">
+        <a href="{% url 'academia:adicional_crear_interno' %}" class="btn btn-success">＋ Adicional Interno</a>
+        <a href="{% url 'academia:adicional_crear_externo' %}" class="btn btn-primary">＋ Persona Externa</a>
+    </div>
+</div>
+
+{# ── Filtros ── #}
+<div class="card-box" style="margin-bottom:20px; padding:16px;">
+    <form method="get" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px; align-items:end;">
+        <div>
+            <label class="form-label">Tipo</label>
+            <select name="tipo" class="form-input">
+                <option value="">— Todos —</option>
+                {% for code, label in tipos_choices %}
+                <option value="{{ code }}" {% if filtros.tipo == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Origen</label>
+            <select name="origen" class="form-input">
+                <option value="">— Todos —</option>
+                <option value="interno" {% if filtros.origen == 'interno' %}selected{% endif %}>Estudiante interno</option>
+                <option value="externo" {% if filtros.origen == 'externo' %}selected{% endif %}>Persona externa</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Desde</label>
+            <input type="date" name="desde" value="{{ filtros.desde }}" class="form-input">
+        </div>
+        <div>
+            <label class="form-label">Hasta</label>
+            <input type="date" name="hasta" value="{{ filtros.hasta }}" class="form-input">
+        </div>
+        <div>
+            <label class="form-label">Buscar (cédula/nombre/curso)</label>
+            <input type="text" name="q" value="{{ filtros.q }}" class="form-input" placeholder="Ej.: 0912...">
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a href="{% url 'academia:adicional_lista' %}" class="btn btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</div>
+
+{# ── Tabla ── #}
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Persona</th>
+                <th>Origen</th>
+                <th>Detalle</th>
+                <th style="text-align:right;">Valor</th>
+                <th>Método</th>
+                <th style="text-align:center;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ad in adicionales %}
+            <tr>
+                <td style="white-space:nowrap;">
+                    <strong style="color:#1a237e; font-family:monospace;">{{ ad.numero_recibo }}</strong>
+                    <div style="font-size:11px; color:#888;">{{ ad.fecha|date:"d/m/Y" }}</div>
+                </td>
+                <td>
+                    <span style="font-size:18px; margin-right:4px;">{{ ad.tipo_icono }}</span>
+                    {{ ad.get_tipo_adicional_display }}
+                </td>
+                <td>
+                    <strong>{{ ad.persona_nombre }}</strong>
+                    <div style="font-size:11px; color:#888;">{{ ad.persona_cedula }}</div>
+                </td>
+                <td>
+                    {% if ad.es_interno %}
+                    <span style="background:#e8f5e9; color:#2e7d32; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600;">INTERNO</span>
+                    {% else %}
+                    <span style="background:#e3f2fd; color:#1a237e; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600;">EXTERNO</span>
+                    {% endif %}
+                </td>
+                <td style="font-size:12px; color:#555;">
+                    {{ ad.detalle_corto }}
+                    {% if ad.matricula_origen_id %}
+                    <div style="font-size:10px; color:#f0ad4e; margin-top:2px;">
+                        ✱ Generado desde matrícula #{{ ad.matricula_origen_id }}
+                    </div>
+                    {% endif %}
+                </td>
+                <td style="text-align:right; white-space:nowrap;">
+                    <strong style="color:#2e7d32;">${{ ad.valor|floatformat:2 }}</strong>
+                </td>
+                <td style="font-size:12px;">
+                    {{ ad.get_metodo_pago_display }}
+                    {% if ad.banco %}
+                    <div style="font-size:10px; color:#666; margin-top:2px;">{{ ad.get_banco_display }}</div>
+                    {% endif %}
+                </td>
+                <td style="text-align:center; white-space:nowrap;">
+                    <a href="{% url 'academia:adicional_editar' ad.pk %}" class="btn btn-warning btn-sm" title="Editar">✎</a>
+                    <form method="post" action="{% url 'academia:adicional_eliminar' ad.pk %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="button" class="btn btn-danger btn-sm" title="Eliminar"
+                                onclick="confirmarAccion(this.form, '¿Eliminar este adicional?', 'danger')">🗑</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align:center; padding:40px 10px; color:#888;">
+                    No hay adicionales registrados con esos filtros.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if count > 300 %}
+<p style="margin-top:14px; color:#888; font-size:12px;">
+    Mostrando los 300 más recientes de {{ count }} totales. Aplica filtros para reducir el listado.
+</p>
+{% endif %}
+
+{% endblock %}

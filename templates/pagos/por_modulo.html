@@ -1,0 +1,507 @@
+{% extends 'base.html' %}
+
+{% block title %}Pagos por Módulo — Control semanal{% endblock %}
+
+{% block extra_head %}
+<style>
+    @media print {
+        @page {
+            size: A3 landscape;
+            margin: 8mm 6mm 10mm 6mm;
+        }
+        html, body {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            color: #000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .no-print, .crumb, .top-bar, header.top, nav, .menu, .sidebar { display: none !important; }
+        .container { padding: 0 !important; max-width: 100% !important; }
+
+        /* Compactar el bloque de título arriba */
+        h2.page-title { font-size: 16px !important; color: #1a237e !important; margin: 0 0 4px 0 !important; }
+        .page-subtitle { font-size: 10px !important; color: #444 !important; margin: 0 0 8px 0 !important; }
+
+        /* ─── Recaudación cover ─── */
+        .recaudacion-cover {
+            border: 1px solid #999 !important;
+            box-shadow: none !important;
+            padding: 8px !important;
+            margin-bottom: 10px !important;
+            page-break-after: avoid;
+        }
+        .recaudacion-title {
+            background: #1a237e !important;
+            color: white !important;
+            padding: 6px 10px !important;
+            font-size: 10px !important;
+            border-radius: 4px !important;
+        }
+        .recaudacion-meta { font-size: 10px !important; gap: 4px !important; margin: 6px 0 !important; }
+        .recaudacion-meta div { background: #f5f7fb !important; padding: 4px 6px !important; }
+
+        .recaudacion-table {
+            width: 100% !important;
+            font-size: 8.5px !important;
+            table-layout: fixed !important;
+        }
+        .recaudacion-table th, .recaudacion-table td {
+            padding: 4px 4px !important;
+            border: 1px solid #999 !important;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: anywhere !important;
+            line-height: 1.25 !important;
+        }
+        .recaudacion-table th {
+            background: #1a237e !important;
+            color: white !important;
+            font-size: 8.5px !important;
+            text-transform: uppercase !important;
+            padding: 5px 4px !important;
+        }
+        /* Anchos de la hoja de recaudación (13 columnas) */
+        .recaudacion-table th:nth-child(1),  .recaudacion-table td:nth-child(1)  { width: 3%; }
+        .recaudacion-table th:nth-child(2),  .recaudacion-table td:nth-child(2)  { width: 13%; }
+        .recaudacion-table th:nth-child(3),  .recaudacion-table td:nth-child(3)  { width: 8%; }
+        .recaudacion-table th:nth-child(4),  .recaudacion-table td:nth-child(4)  { width: 9%; }
+        .recaudacion-table th:nth-child(5),  .recaudacion-table td:nth-child(5)  { width: 7%; }
+        .recaudacion-table th:nth-child(6),  .recaudacion-table td:nth-child(6)  { width: 4%; }
+        .recaudacion-table th:nth-child(7),  .recaudacion-table td:nth-child(7)  { width: 7%; }
+        .recaudacion-table th:nth-child(8),  .recaudacion-table td:nth-child(8)  { width: 7%; }
+        .recaudacion-table th:nth-child(9),  .recaudacion-table td:nth-child(9)  { width: 7%; }
+        .recaudacion-table th:nth-child(10), .recaudacion-table td:nth-child(10) { width: 7%; }
+        .recaudacion-table th:nth-child(11), .recaudacion-table td:nth-child(11) { width: 7%; }
+        .recaudacion-table th:nth-child(12), .recaudacion-table td:nth-child(12) { width: 14%; }
+        .recaudacion-table th:nth-child(13), .recaudacion-table td:nth-child(13) { width: 7%; }
+
+        /* ─── Resumen por módulo ─── */
+        .matriz-resumen {
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)) !important;
+            gap: 6px !important;
+            margin-bottom: 10px !important;
+        }
+        .matriz-resumen .card-box {
+            padding: 8px !important;
+            border-top: 3px solid #1a237e !important;
+            box-shadow: none !important;
+            border: 1px solid #ccc !important;
+            border-top: 3px solid #1a237e !important;
+            page-break-inside: avoid;
+        }
+        .matriz-resumen .card-box > div:nth-child(2) { font-size: 14px !important; }
+
+        /* ─── Matriz: estudiantes × módulos ─── */
+        .matriz-tabla {
+            font-size: 8.5px !important;
+            width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+        }
+        /* Quitar el sticky en impresión: causa problemas de posicionamiento al imprimir */
+        .matriz-tabla th, .matriz-tabla td {
+            position: static !important;
+            min-width: 0 !important;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: anywhere !important;
+            padding: 4px 3px !important;
+            border: 1px solid #999 !important;
+            line-height: 1.2 !important;
+            vertical-align: middle !important;
+        }
+        .matriz-tabla th {
+            background: #1a237e !important;
+            color: white !important;
+            font-size: 8.5px !important;
+            text-transform: uppercase;
+            padding: 5px 3px !important;
+        }
+        .matriz-tabla thead { display: table-header-group !important; }
+        .matriz-tabla tr { page-break-inside: avoid !important; }
+        /* Las celdas con estado de módulo conservan su color de fondo */
+        .matriz-tabla td[style*="background:#e8f5e9"] { background: #e8f5e9 !important; }
+        .matriz-tabla td[style*="background:#fff8e1"] { background: #fff8e1 !important; }
+        .matriz-tabla td[style*="background:#ffebee"] { background: #ffebee !important; }
+
+        .asistencia-cell { min-height: 18px; min-width: 0; width: 100%; border-bottom: 1px solid #555; }
+
+        /* Forzar que las cards y el wrap de la matriz no tengan sombras */
+        .card-box { box-shadow: none !important; border: 1px solid #ccc !important; }
+
+        /* Encabezado solo de impresión */
+        .print-header { display: block !important; }
+    }
+    .recaudacion-cover {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 18px;
+        margin-bottom: 18px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .recaudacion-title {
+        background: #1a237e;
+        color: white;
+        padding: 11px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .recaudacion-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 8px;
+        margin: 10px 0 12px;
+        font-size: 12px;
+    }
+    .recaudacion-meta div {
+        background: #f5f7fb;
+        border-radius: 6px;
+        padding: 7px 10px;
+    }
+    .recaudacion-meta strong { color: #1a237e; }
+    /* ─── Tabla de recaudación: mismo estilo que la matriz ─── */
+    .recaudacion-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    .recaudacion-table th, .recaudacion-table td {
+        border: 1px solid #e0e3f5;
+        padding: 10px 10px;
+        white-space: normal;
+        vertical-align: middle;
+    }
+    .recaudacion-table thead tr {
+        background: #1a237e;
+        color: white;
+    }
+    .recaudacion-table th {
+        text-transform: uppercase;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        padding: 12px 10px;
+    }
+    .recaudacion-table tbody tr {
+        border-bottom: 1px solid #eef0fa;
+    }
+    .recaudacion-table tbody tr:hover {
+        background: #f5f7ff;
+    }
+    .recaudacion-title {
+        background: #1a237e;
+        color: white;
+        padding: 11px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    /* Casilla de asistencia / firma — línea para escribir a mano */
+    .asistencia-cell {
+        display: block;
+        min-height: 28px;
+        min-width: 100px;
+        border-bottom: 1px solid #999;
+    }
+    /* Chips de estado del módulo dentro de la recaudación */
+    .mod-chip-pagado  { background:#e8f5e9; color:#2e7d32; font-weight:700; padding:3px 8px; border-radius:6px; }
+    .mod-chip-parcial { background:#fff8e1; color:#856404; font-weight:700; padding:3px 8px; border-radius:6px; }
+    .mod-chip-pendiente { background:#ffebee; color:#c62828; font-weight:700; padding:3px 8px; border-radius:6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crumb no-print">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:pagos_lista' %}">Pagos</a> &nbsp;›&nbsp;
+    Por Módulo
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+    <div>
+        <h2 class="page-title">📊 Pagos por Módulo</h2>
+        <p class="page-subtitle">
+            Control semanal del avance del curso. La matriz muestra únicamente
+            los <strong>pagos directos a cada módulo</strong> (tipo "Por Módulo").
+            La reserva y los abonos libres se ven en la pantalla de pagos del
+            estudiante y suman al saldo total, pero no aparecen aquí.
+        </p>
+    </div>
+    {% if curso_sel %}
+    <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap;">
+        {% with qs="?curso="|add:filtros.curso|add:"&modalidad="|add:filtros.modalidad|add:"&ciudad="|add:filtros.ciudad|add:"&tipo_matricula="|add:filtros.tipo_matricula|add:"&filtro_modulo_estado="|add:filtros.filtro_modulo_estado %}
+        <a href="{% url 'academia:pagos_por_modulo_export_excel' %}{{ qs }}"
+           class="btn btn-secondary" title="Exportar a Excel">📊 Excel</a>
+        <a href="{% url 'academia:pagos_por_modulo_export_pdf' %}{{ qs }}"
+           class="btn btn-secondary" title="Exportar a PDF">📄 PDF</a>
+        <button type="button" onclick="window.print()" class="btn btn-secondary"
+            title="Imprimir">🖨️ Imprimir</button>
+        {% endwith %}
+    </div>
+    {% endif %}
+</div>
+
+{# ─── Filtros ─────────────────────────────────────── #}
+<div class="card-box no-print" style="margin-bottom:18px; padding:16px;">
+    <form method="get" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px; align-items:end;">
+        <div>
+            <label class="form-label" style="font-size:11px;">Curso *</label>
+            <select name="curso" class="form-input" required>
+                <option value="">— Selecciona un curso —</option>
+                {% for c in cursos %}
+                <option value="{{ c.pk }}" {% if filtros.curso == c.pk|stringformat:"s" %}selected{% endif %}>
+                    {{ c.nombre }} ({{ c.numero_modulos }} Presencial / {{ c.numero_modulos_online }} Online)
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Modalidad</label>
+            <select name="modalidad" class="form-input">
+                <option value="">— Todas —</option>
+                <option value="presencial" {% if filtros.modalidad == 'presencial' %}selected{% endif %}>🏫 Presencial</option>
+                <option value="online" {% if filtros.modalidad == 'online' %}selected{% endif %}>🟢 Online</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Ciudad</label>
+            <select name="ciudad" class="form-input">
+                <option value="">— Todas —</option>
+                <option value="Guayaquil" {% if filtros.ciudad == 'Guayaquil' %}selected{% endif %}>Guayaquil</option>
+                <option value="Quito" {% if filtros.ciudad == 'Quito' %}selected{% endif %}>Quito</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Tipo de matrícula</label>
+            <select name="tipo_matricula" class="form-input">
+                <option value="">— Todos —</option>
+                {% for codigo, etiqueta in tipos_matricula %}
+                <option value="{{ codigo }}" {% if filtros.tipo_matricula == codigo %}selected{% endif %}>
+                    {{ etiqueta }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Estado por Módulo</label>
+            <select name="filtro_modulo_estado" class="form-input">
+                <option value="">— Todos —</option>
+                {% if modulos %}
+                    {% for n in modulos %}
+                    <optgroup label="── Módulo {{ n }}">
+                        <option value="{{ n }}_Pagado"   {% if filtros.filtro_modulo_estado == n|stringformat:"s"|add:"_Pagado"   %}selected{% endif %}>✓ Módulo {{ n }} — Pagado</option>
+                        <option value="{{ n }}_Pendiente"{% if filtros.filtro_modulo_estado == n|stringformat:"s"|add:"_Pendiente"%}selected{% endif %}>○ Módulo {{ n }} — Pendiente</option>
+                    </optgroup>
+                    {% endfor %}
+                {% else %}
+                    {% for n in "12345678" %}
+                    <optgroup label="── Módulo {{ n }}">
+                        <option value="{{ n }}_Pagado">✓ Módulo {{ n }} — Pagado</option>
+                        <option value="{{ n }}_Pendiente">○ Módulo {{ n }} — Pendiente</option>
+                    </optgroup>
+                    {% endfor %}
+                {% endif %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Aplicar</button>
+    </form>
+</div>
+
+{% if not curso_sel %}
+<div class="card-box" style="padding:30px; text-align:center; background:#f5f7ff;">
+    <p style="font-size:15px; color:#666;">
+        👆 Selecciona un curso arriba para ver el detalle de pagos por módulo.
+    </p>
+</div>
+
+{% else %}
+
+<div class="print-header" style="display:none; margin-bottom:8px; text-align:center;">
+    <h2 style="font-size:16px; color:#1a237e; margin:0;">📊 Pagos por Módulo — {{ curso_sel.nombre }}</h2>
+    <div style="font-size:10px; color:#444; margin-top:2px;">
+        Generado: {% now "d/m/Y H:i" %}
+        {% if filtros.modalidad %} · Modalidad: {{ filtros.modalidad|title }}{% endif %}
+        {% if filtros.ciudad %} · Ciudad: {{ filtros.ciudad }}{% endif %}
+        · Estudiantes: {{ matriculas_data|length }}
+    </div>
+</div>
+
+{# Banner informativo — sin tabla de recaudación (redundante) #}
+<div style="background:#1a237e; color:white; padding:13px 18px; border-radius:8px; font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:0.3px; margin-bottom:16px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;">
+    <span>MÓDULO DE {{ curso_sel.nombre|upper }} &nbsp;//&nbsp; Recordar que si el estudiante falta a clases igual debe cumplir con el plan de financiamiento</span>
+    <span style="font-size:11px; font-weight:400; background:rgba(255,255,255,0.15); padding:4px 10px; border-radius:20px; text-transform:none; letter-spacing:0;">
+        Curso: <strong>{{ curso_sel.nombre }}</strong> &nbsp;·&nbsp;
+        Modalidad: <strong>{% if filtros.modalidad %}{{ filtros.modalidad|title }}{% else %}Todas{% endif %}</strong> &nbsp;·&nbsp;
+        Ciudad: <strong>{{ filtros.ciudad|default:"Todas" }}</strong> &nbsp;·&nbsp;
+        Estudiantes: <strong>{{ matriculas_data|length }}</strong>
+    </span>
+</div>
+
+{# ─── Matriz: estudiantes × módulos ─────────────── #}
+<div class="card-box" style="padding:0; overflow-x:auto;">
+    <table class="matriz-tabla" style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+            <tr style="background:#1a237e; color:white;">
+                <th style="padding:12px 10px; text-align:left; min-width:240px; position:sticky; left:0; background:#1a237e; z-index:2;">
+                    Estudiante
+                </th>
+                <th style="padding:12px 8px; text-align:center; min-width:160px;">Curso</th>
+                <th style="padding:12px 8px; text-align:center; min-width:140px;">Jornada</th>
+                <th style="padding:12px 8px; text-align:center; min-width:100px;">Día</th>
+                <th style="padding:12px 8px; text-align:center; min-width:120px;">Tipo matrícula</th>
+                <th style="padding:12px 8px; text-align:center; min-width:110px;">Valor curso</th>
+                <th style="padding:12px 8px; text-align:center; min-width:90px;">Pagado</th>
+                <th style="padding:12px 8px; text-align:center; min-width:90px;">Saldo</th>
+                {% for n in modulos %}
+                <th style="padding:12px 8px; text-align:center; min-width:90px; background:#283593;">
+                    Mód. {{ n }}
+                </th>
+                {% endfor %}
+                <th style="padding:12px 8px; text-align:center; min-width:140px;">Asistencia</th>
+                <th style="padding:12px 8px; text-align:center; min-width:80px;" class="no-print">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in matriculas_data %}
+            <tr style="border-bottom:1px solid #eee;">
+                <td style="padding:10px; position:sticky; left:0; background:white; z-index:1; border-right:1px solid #eee;">
+                    <div style="font-weight:600; color:#1a237e;">{{ row.estudiante.apellidos }} {{ row.estudiante.nombres }}</div>
+                    <div style="font-size:11px; color:#888;">{{ row.estudiante.cedula }}</div>
+                </td>
+                <td style="padding:10px; text-align:center; font-weight:600; color:#1a237e;">
+                    {{ row.curso_nombre }}
+                </td>
+                <td style="padding:10px; white-space:normal; text-align:center;">
+                    <strong>{{ row.jornada_dia }}</strong>
+                    {% if row.jornada_horario and row.jornada_horario != '—' %}
+                    <div style="font-size:11px; color:#666;">{{ row.jornada_horario }}</div>
+                    {% endif %}
+                    {% if row.jornada_sede and row.jornada_sede != '—' %}
+                    <div style="font-size:10px; color:#888;">{{ row.jornada_sede }}</div>
+                    {% endif %}
+                </td>
+                <td style="padding:10px; text-align:center; font-size:12px;">
+                    {% if row.jornada_inicio %}
+                        <strong>{{ row.jornada_inicio|date:"d/m/Y" }}</strong>
+                    {% else %}
+                        <span style="color:#999;">—</span>
+                    {% endif %}
+                </td>
+                <td style="padding:10px; text-align:center; font-size:11px;">
+                    {% if row.tipo_matricula_codigo == 'reserva_abono' %}
+                        <span style="background:#fff3e0; color:#e65100; padding:3px 8px; border-radius:6px; font-weight:600;">Reserva / Abono</span>
+                    {% elif row.tipo_matricula_codigo == 'reserva_modulo_1' %}
+                        <span style="background:#e8f5e9; color:#2e7d32; padding:3px 8px; border-radius:6px; font-weight:600;">Reserva + Mód. 1</span>
+                    {% else %}
+                        <span style="background:#e3f2fd; color:#0d47a1; padding:3px 8px; border-radius:6px; font-weight:600;">Programa Completo</span>
+                    {% endif %}
+                </td>
+                <td style="padding:10px; text-align:center;">
+                    {% if row.matricula.tiene_descuento %}
+                        <div style="font-size:11px; color:#999; text-decoration:line-through;">${{ row.matricula.valor_curso|floatformat:2 }}</div>
+                        <div style="font-size:10px; background:#ffebee; color:#c62828; font-weight:700; padding:1px 6px; border-radius:4px; display:inline-block; margin:2px 0;">−${{ row.matricula.descuento|floatformat:2 }}</div>
+                        <div style="font-weight:700; color:#1a237e; font-size:13px;">${{ row.matricula.valor_neto|floatformat:2 }}</div>
+                    {% else %}
+                        <div style="font-weight:700; color:#1a237e; font-size:13px;">${{ row.matricula.valor_neto|floatformat:2 }}</div>
+                    {% endif %}
+                </td>
+                <td style="padding:10px; text-align:center; color:#2e7d32; font-weight:600;">
+                    ${{ row.matricula.valor_pagado|floatformat:2 }}
+                    {% if row.reserva_total > 0 %}
+                    <div style="font-size:10px; color:#888; font-weight:500; margin-top:2px;">
+                        Reservado: ${{ row.reserva_total|floatformat:2 }}
+                    </div>
+                    {% endif %}
+                </td>
+                <td style="padding:10px; text-align:center; font-weight:700; color:{% if row.matricula.saldo > 0 %}#c62828{% else %}#2e7d32{% endif %};">
+                    ${{ row.matricula.saldo|floatformat:2 }}
+                </td>
+                {% for mod in row.modulos_data %}
+                {% comment %}
+                Visual en la matriz:
+                  - "No aplica" (gris claro) → la matrícula no llega a este
+                    módulo porque su modalidad tiene menos módulos que el
+                    máximo mostrado (ej. matrícula online en un curso cuya
+                    modalidad presencial tiene más módulos).
+                  - Programa Completo con saldo $0 → todos los módulos que SÍ
+                    aplican se muestran como "Programa Completo" en verde,
+                    porque el estudiante pagó todo de una sola vez.
+                  - Pagado (verde) → el módulo recibió al menos un pago directo,
+                    sin importar si cubre el valor esperado o solo parte.
+                  - Sin pagar (rojo) → no se ha registrado ningún pago al módulo.
+                Los estados internos siguen siendo 3 (Pagado/Parcial/Pendiente)
+                para reportes y filtros, pero el render colapsa los casos.
+                {% endcomment %}
+                {% if not mod.aplica %}
+                <td style="padding:8px; text-align:center; background:#f5f5f5;">
+                    <div style="color:#bbb; font-size:11px;">—</div>
+                </td>
+                {% elif row.tipo_matricula_codigo == 'programa_completo' and row.matricula.saldo <= 0 %}
+                <td style="padding:8px; text-align:center; background:#e8f5e9;">
+                    <div style="color:#2e7d32; font-weight:700; font-size:11px; line-height:1.2;">
+                        ✓ Programa<br>Completo
+                    </div>
+                </td>
+                {% else %}
+                <td style="padding:8px; text-align:center;
+                    {% if mod.estado == 'Pendiente' %}background:#ffebee;
+                    {% else %}background:#e8f5e9;{% endif %}">
+                    {% if mod.estado == 'Pendiente' %}
+                        <div style="color:#c62828; font-weight:700;">○ Sin pagar</div>
+                    {% else %}
+                        <div style="color:#2e7d32; font-weight:700;">✓ ${{ mod.pagado|floatformat:2 }}</div>
+                        {% if mod.fecha_pago %}
+                        <div style="font-size:10px; color:#2e7d32; margin-top:2px;">{{ mod.fecha_pago|date:"d/m/Y" }}</div>
+                        {% endif %}
+                    {% endif %}
+                </td>
+                {% endif %}
+                {% endfor %}
+                <td style="padding:8px; text-align:center;">
+                    <span class="asistencia-cell"></span>
+                </td>
+                <td style="padding:8px; text-align:center;" class="no-print">
+                    <a href="{% url 'academia:matricula_abonos' row.matricula.pk %}"
+                       class="btn btn-secondary btn-sm" style="font-size:11px;">
+                        Ver pagos
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="{{ modulos|length|add:10 }}" style="padding:30px; text-align:center; color:#888;">
+                    No hay estudiantes matriculados en este curso con los filtros aplicados.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top:14px; font-size:12px; color:#666;">
+    <strong>Leyenda:</strong>
+    <span style="background:#e8f5e9; padding:2px 8px; border-radius:6px; color:#2e7d32; font-weight:600;">✓ Pagado</span> ·
+    <span style="background:#e8f5e9; padding:2px 8px; border-radius:6px; color:#2e7d32; font-weight:600;">✓ Programa Completo</span> ·
+    <span style="background:#ffebee; padding:2px 8px; border-radius:6px; color:#c62828; font-weight:600;">○ Sin pagar</span>
+    <br><br>
+    <em>
+        Valor sugerido por módulo = Valor neto del curso / N° de módulos.
+        Cada módulo se paga de forma independiente: solo cuentan en la matriz
+        los abonos asignados explícitamente a un módulo (tipo "Por Módulo").
+        Cuando el tipo de matrícula es <strong>Programa Completo</strong> y el saldo
+        está en $0, los módulos se marcan como pagados aunque no haya un abono
+        individual por módulo, porque el estudiante canceló el curso de una sola vez.
+        La reserva y los abonos libres no aparecen aquí pero sí en el saldo
+        total y en el historial de pagos del estudiante.
+    </em>
+</div>
+{% endif %}
+{% endblock %}

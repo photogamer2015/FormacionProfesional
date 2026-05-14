@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+
+{% block title %}Egresos — Registro Administrativo{% endblock %}
+
+{% block extra_head %}
+<style>
+@media print {
+    header.top, .crumb, .no-print, .btn, form, button { display: none !important; }
+    body { background: white !important; }
+    .container { max-width: 100% !important; padding: 0 !important; }
+    .card-box, .table-wrap {
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+    }
+    .page-title { color: #1a237e !important; font-size: 18pt !important; }
+    table { font-size: 10pt !important; }
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:admin_dashboard' %}">Registro Administrativo</a> &nbsp;›&nbsp;
+    Egresos
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+    <div>
+        <h2 class="page-title">📒 Egresos / Gastos</h2>
+        <p class="page-subtitle">Total filtrado: <strong style="color:#c62828;">${{ total_filtrado|floatformat:2 }}</strong> · {{ egresos|length }} registro{{ egresos|length|pluralize }}</p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;" class="no-print">
+        <a href="{% url 'academia:admin_export_egresos' %}?{{ request.GET.urlencode }}"
+           class="btn btn-secondary" title="Descargar lista filtrada en CSV">📥 Exportar</a>
+        <button type="button" onclick="window.print()" class="btn btn-secondary">🖨️ Imprimir</button>
+        <a href="{% url 'academia:admin_egreso_crear' %}" class="btn btn-success">+ Nuevo egreso</a>
+    </div>
+</div>
+
+{# ─── Filtros ─────────────────────────────────────────── #}
+<form method="get" class="card-box" style="padding:16px; margin-bottom:18px;">
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px; align-items:end;">
+        <div>
+            <label class="form-label">Buscar concepto</label>
+            <input type="text" name="q" value="{{ filtros.q }}" class="form-input" placeholder="Ej.: sueldo, alquiler…">
+        </div>
+        <div>
+            <label class="form-label">Categoría</label>
+            <select name="categoria" class="form-input">
+                <option value="">Todas</option>
+                {% for c in categorias %}
+                    <option value="{{ c.pk }}" {% if filtros.categoria == c.pk|stringformat:"s" %}selected{% endif %}>
+                        {{ c.icono }} {{ c.nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Desde</label>
+            <input type="date" name="desde" value="{{ filtros.desde }}" class="form-input">
+        </div>
+        <div>
+            <label class="form-label">Hasta</label>
+            <input type="date" name="hasta" value="{{ filtros.hasta }}" class="form-input">
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a href="{% url 'academia:admin_egresos_lista' %}" class="btn btn-secondary">Limpiar</a>
+        </div>
+    </div>
+</form>
+
+{# ─── Tabla ───────────────────────────────────────────── #}
+<div class="table-wrap">
+    {% if egresos %}
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Categoría</th>
+                <th>Concepto</th>
+                <th>Monto</th>
+                <th>Notas</th>
+                <th>Registrado por</th>
+                <th class="no-print">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in egresos %}
+            <tr>
+                <td>{{ e.fecha|date:"d/m/Y" }}</td>
+                <td>
+                    <span style="background:{{ e.categoria.color }}; color:white; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600;">
+                        {{ e.categoria.icono|default:"•" }} {{ e.categoria.nombre }}
+                    </span>
+                </td>
+                <td><strong>{{ e.concepto }}</strong></td>
+                <td><strong style="color:#c62828; font-size:14px;">${{ e.monto|floatformat:2 }}</strong></td>
+                <td style="font-size:11px; color:#666; max-width:240px; white-space:normal;">
+                    {{ e.notas|default:"—"|truncatechars:60 }}
+                </td>
+                <td style="font-size:11px; color:#888;">
+                    {% if e.registrado_por %}{{ e.registrado_por.get_full_name|default:e.registrado_por.username }}{% else %}—{% endif %}
+                    <div style="font-size:10px; color:#aaa;">{{ e.creado|date:"d/m H:i" }}</div>
+                </td>
+                <td class="no-print">
+                    <div class="row-actions">
+                        <a href="{% url 'academia:admin_egreso_editar' e.pk %}" class="btn btn-warning btn-sm">Editar</a>
+                        <form method="post" action="{% url 'academia:admin_egreso_eliminar' e.pk %}"
+                              style="display:inline;"
+                              onsubmit="return false;">
+                            {% csrf_token %}
+                            <button type="button" class="btn btn-danger btn-sm"
+                                onclick="confirmarAccion(this.closest('form'), '¿Eliminar este egreso? Esta acción no se puede deshacer.', 'danger')">×</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <div class="empty-state">
+            <p style="font-size:15px; margin-bottom:12px;">No hay egresos registrados con esos filtros.</p>
+            <a href="{% url 'academia:admin_egreso_crear' %}" class="btn btn-primary">+ Registrar egreso</a>
+        </div>
+    {% endif %}
+</div>
+
+<div style="margin-top:16px;">
+    <a href="{% url 'academia:admin_dashboard' %}" class="btn btn-secondary">‹ Volver al panel</a>
+</div>
+{% endblock %}

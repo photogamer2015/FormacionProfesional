@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}Marcar clase a recuperación{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:matricula_abonos' matricula.pk %}">{{ matricula.estudiante.nombre_completo }}</a> &nbsp;›&nbsp;
+    Marcar clase a recuperación
+</div>
+
+<h2 class="page-title">✱ Marcar clase a recuperación</h2>
+
+<div class="card-box" style="max-width:620px; padding:24px; margin-top:14px;">
+    <div style="background:#fff8e1; border-left:4px solid #f0ad4e; padding:14px; border-radius:8px; margin-bottom:18px;">
+        <div style="font-weight:600; color:#1a237e; font-size:15px;">{{ matricula.estudiante.nombre_completo }}</div>
+        <div style="font-size:13px; color:#666; margin-top:4px;">
+            Cédula: {{ matricula.estudiante.cedula }} · {{ matricula.curso.nombre }} ({{ matricula.get_modalidad_display }})
+        </div>
+        <div style="display:flex; gap:24px; margin-top:10px; font-size:13px;">
+            <div>Valor neto: <strong>${{ matricula.valor_neto|floatformat:2 }}</strong></div>
+            <div>Pagado: <strong style="color:#2e7d32;">${{ matricula.valor_pagado|floatformat:2 }}</strong></div>
+            <div>Saldo: <strong style="color:{% if matricula.saldo > 0 %}#c62828{% else %}#2e7d32{% endif %};">${{ matricula.saldo|floatformat:2 }}</strong></div>
+        </div>
+    </div>
+
+    <p style="font-size:13px; color:#666; margin-bottom:14px;">
+        Indica qué módulo perdió el estudiante. El saldo pendiente actual quedará registrado
+        para mostrarlo cuando se cobre la recuperación.
+    </p>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div style="margin-bottom:14px;">
+            <label class="form-label">{{ form.numero_modulo.label }} *</label>
+            {{ form.numero_modulo }}
+            {{ form.numero_modulo.errors }}
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label class="form-label">{{ form.fecha_marcada.label }} *</label>
+            {{ form.fecha_marcada }}
+            {{ form.fecha_marcada.errors }}
+        </div>
+
+        <div style="margin-bottom:18px;">
+            <label class="form-label">Observaciones</label>
+            {{ form.observaciones }}
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+            <a href="{% url 'academia:matricula_abonos' matricula.pk %}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-warning" style="background:#f0ad4e; color:white; border:none;">
+                ✱ Marcar recuperación
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

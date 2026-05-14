@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+
+{% block title %}Lista de Matriculados — {{ modalidad_label }}{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:matricula_menu' modalidad=modalidad %}">Matrícula</a> &nbsp;›&nbsp;
+    Lista
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+    <div>
+        <h2 class="page-title">
+            {% if modalidad == 'online' %}🟢{% else %}🏫{% endif %}
+            Matriculados {{ modalidad_label }}
+        </h2>
+        <p class="page-subtitle">Total: {{ matriculas.count }} estudiante{{ matriculas.count|pluralize }} matriculado{{ matriculas.count|pluralize }} en esta modalidad.</p>
+    </div>
+</div>
+
+{# ── Tabs Presencial / Online ──────────────────────── #}
+<div class="modalidad-tabs" style="margin-bottom: 24px;">
+    <a href="{% url 'academia:matricula_lista' modalidad='presencial' %}"
+       class="{% if modalidad == 'presencial' %}active{% endif %}">
+        🏫 Presencial
+    </a>
+    <a href="{% url 'academia:matricula_lista' modalidad='online' %}"
+       class="{% if modalidad == 'online' %}active{% endif %}">
+        🟢 Online
+    </a>
+</div>
+
+<div class="toolbar" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:white; padding:16px; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+    <form method="get" style="display:flex; gap:8px; flex-wrap:wrap; flex:1; min-width:280px;">
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por cédula, nombre, curso o cédula de factura…"
+            class="form-input" style="flex:1; min-width:220px;">
+        <select name="curso" class="form-input" style="max-width:220px;">
+            <option value="">Todos los cursos</option>
+            {% for c in cursos %}
+            <option value="{{ c.id }}" {% if curso_seleccionado == c.id|stringformat:"s" %}selected{% endif %}>
+                {{ c.nombre }}
+            </option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+        {% if q or curso_seleccionado %}
+        <a href="{% url 'academia:matricula_lista' modalidad=modalidad %}" class="btn btn-secondary">Limpiar</a>
+        {% endif %}
+    </form>
+
+    <div style="display:flex; gap:6px;">
+        <a href="{% url 'academia:matricula_export_excel' modalidad=modalidad %}{% if q or curso_seleccionado %}?q={{ q }}&curso={{ curso_seleccionado }}{% endif %}"
+            class="btn btn-secondary" title="Exportar a Excel">
+            📊 Excel
+        </a>
+        <a href="{% url 'academia:matricula_export_pdf' modalidad=modalidad %}{% if q or curso_seleccionado %}?q={{ q }}&curso={{ curso_seleccionado }}{% endif %}"
+            class="btn btn-secondary" title="Exportar a PDF">
+            📄 PDF
+        </a>
+        <a href="{% url 'academia:matricula_registrar' modalidad=modalidad %}" class="btn btn-success">
+            + Nueva matrícula
+        </a>
+    </div>
+</div>
+
+<div class="table-wrap">
+    {% if matriculas %}
+    <table>
+        <thead>
+            <tr>
+                <th>Cédula</th>
+                <th>Estudiante</th>
+                <th>Celular</th>
+                <th>Curso</th>
+                <th>Modalidad</th>
+                <th>Tipo matrícula</th>
+                <th>Jornada</th>
+                <th>Inicio jornada</th>
+                <th>Sede</th>
+                <th>Fecha matric.</th>
+                <th>Valor</th>
+                <th>Pagado</th>
+                <th>Saldo</th>
+                <th>Estado</th>
+                <th>Pago</th>
+                <th>Tipo registro</th>
+                <th>Vendedora</th>
+                <th>Factura</th>
+                <th>Comp.</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in matriculas %}
+            <tr>
+                <td><strong>{{ m.estudiante.cedula }}</strong></td>
+                <td>
+                    {{ m.estudiante.apellidos }} {{ m.estudiante.nombres }}
+                    {% if m.estudiante.correo %}
+                    <div style="font-size:11px; color:#666;">{{ m.estudiante.correo }}</div>
+                    {% endif %}
+                </td>
+                <td>{{ m.estudiante.celular|default:'—' }}</td>
+                <td>{{ m.curso.nombre }}</td>
+                <td>
+                    <span class="badge badge-{{ m.modalidad }}" style="font-size:10px;">
+                        {% if m.modalidad == 'online' %}🟢 Online{% else %}🏫 Presencial{% endif %}
+                    </span>
+                </td>
+                <td style="font-size:12px;">{{ m.get_tipo_matricula_display }}</td>
+                <td style="font-size:12px;">
+                    {% if m.jornada %}{{ m.jornada.descripcion_legible }}{% else %}—{% endif %}
+                </td>
+                <td style="font-size:12px;">
+                    {% if m.jornada and m.jornada.fecha_inicio %}
+                        <strong>{{ m.jornada.fecha_inicio|date:"d/m/Y" }}</strong>
+                    {% else %}—{% endif %}
+                </td>
+                <td>{{ m.sede }}</td>
+                <td>{{ m.fecha_matricula|date:"d/m/Y" }}</td>
+                <td>
+                    {% if m.tiene_descuento %}
+                        <div style="font-size:11px; color:#888; text-decoration:line-through;">${{ m.valor_curso }}</div>
+                        <strong>${{ m.valor_neto }}</strong>
+                        <div style="font-size:10px; color:#e65100; font-weight:600; margin-top:2px;">
+                            Descuento: ${{ m.descuento }}
+                        </div>
+                    {% else %}
+                        ${{ m.valor_curso }}
+                    {% endif %}
+                </td>
+                <td>${{ m.valor_pagado }}</td>
+                <td>
+                    <strong style="color: {% if m.saldo > 0 %}#c62828{% else %}#2e7d32{% endif %};">
+                        ${{ m.saldo }}
+                    </strong>
+                </td>
+                <td>
+                    {% if m.estado == 'retiro_voluntario' %}
+                    <span class="badge" style="background:#FFEbee; color:#c62828;">Retiro</span>
+                    {% else %}
+                    <span class="badge" style="background:#E8F5E9; color:#2E7D32;">Activa</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if m.estado_pago == 'Pagado' %}
+                    <span class="badge badge-pagado">Pagado</span>
+                    {% elif m.estado_pago == 'Parcial' %}
+                    <span class="badge badge-parcial">Parcial</span>
+                    {% else %}
+                    <span class="badge badge-pendiente">Pendiente</span>
+                    {% endif %}
+                </td>
+                <td style="font-size:11px;">
+                    {% if m.tipo_registro %}{{ m.get_tipo_registro_display }}{% else %}—{% endif %}
+                </td>
+                <td style="font-size:11px;">
+                    {% if m.registrado_por %}
+                    {{ m.registrado_por.get_full_name|default:m.registrado_por.username }}
+                    {% else %}—{% endif %}
+                </td>
+                <td style="font-size:11px;">
+                    {% if m.factura_realizada == 'si' %}
+                    <span style="color:#2e7d32; font-weight:600;">Sí</span>
+                    {% if m.fact_cedula %}<div style="color:#666;">{{ m.fact_cedula }}</div>{% endif %}
+                    {% else %}
+                    <span style="color:#888;">No</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if m.link_comprobante %}
+                    <a href="{{ m.link_comprobante }}" target="_blank" rel="noopener" title="Ver comprobante de pago"
+                        style="text-decoration:none;">🔗</a>
+                    {% else %}—{% endif %}
+                </td>
+                <td>
+                    <div class="row-actions">
+                        <a href="{% url 'academia:matricula_editar' modalidad=modalidad pk=m.pk %}"
+                            class="btn btn-warning btn-sm">Editar</a>
+                        <form method="post" action="{% url 'academia:matricula_eliminar' modalidad=modalidad pk=m.pk %}"
+                            style="display:inline;"
+                            onsubmit="return false;">
+                            {% csrf_token %}
+                            <button type="button" class="btn btn-danger btn-sm"
+                                onclick="confirmarAccion(this.closest('form'), '¿Eliminar esta matrícula? También se eliminará el comprobante asociado.', 'danger')">Eliminar</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p style="font-size:15px; margin-bottom:12px;">No hay matrículas {{ modalidad_label|lower }} registradas
+            todavía.</p>
+        <a href="{% url 'academia:matricula_registrar' modalidad=modalidad %}" class="btn btn-primary">Registrar la
+            primera</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

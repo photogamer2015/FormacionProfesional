@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Estudiantes{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp; Estudiantes
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:8px;">
+    <div>
+        <h2 class="page-title">👥 Directorio de Estudiantes</h2>
+        <p class="page-subtitle">Total: {{ total }} estudiante{{ total|pluralize }} registrado{{ total|pluralize }}.</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+        <a href="{% url 'academia:estudiantes_export' %}?q={{ q }}" class="btn btn-success">📥 Excel (todos)</a>
+        <a href="{% url 'academia:estudiantes_por_curso' %}" class="btn btn-secondary">Ver por curso</a>
+    </div>
+</div>
+
+
+<div class="modalidad-tabs">
+    <a href="{% url 'academia:estudiantes_lista' %}" class="active">📋 Listado completo</a>
+    <a href="{% url 'academia:estudiantes_por_curso' %}">📚 Agrupados por curso</a>
+</div>
+
+<div class="card-box" style="margin-bottom:18px; padding:14px;">
+    <form method="get" style="display:flex; gap:10px; align-items:center;">
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por cédula, nombre, correo o celular…"
+               class="form-input" style="flex:1;">
+        <button type="submit" class="btn btn-primary">Buscar</button>
+        {% if q %}
+            <a href="{% url 'academia:estudiantes_lista' %}" class="btn btn-secondary">Limpiar</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="table-wrap">
+    {% if estudiantes %}
+    <table>
+        <thead>
+            <tr>
+                <th>Cédula</th>
+                <th>Apellidos y Nombres</th>
+                <th>Edad</th>
+                <th>Correo</th>
+                <th>Celular</th>
+                <th>Ciudad</th>
+                <th>Nivel formación</th>
+                <th>Matrículas</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in estudiantes %}
+            <tr>
+                <td><strong>{{ e.cedula }}</strong></td>
+                <td>{{ e.apellidos }} {{ e.nombres }}</td>
+                <td>{{ e.edad|default:'—' }}</td>
+                <td>{{ e.correo|default:'—' }}</td>
+                <td>{{ e.celular|default:'—' }}</td>
+                <td>{{ e.ciudad|default:'—' }}</td>
+                <td>{{ e.get_nivel_formacion_display|default:'—' }}</td>
+                <td>
+                    {% if e.num_matriculas > 0 %}
+                        <span class="badge badge-pagado">{{ e.num_matriculas }} curso{{ e.num_matriculas|pluralize }}</span>
+                    {% else %}
+                        <span class="badge badge-pendiente">Sin matrículas</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'academia:estudiante_detalle' e.pk %}" class="btn btn-primary btn-sm">Ver detalle</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <div class="empty-state">
+            {% if q %}
+                <p style="font-size:15px;">No se encontraron estudiantes con "<strong>{{ q }}</strong>".</p>
+                <a href="{% url 'academia:estudiantes_lista' %}" class="btn btn-secondary" style="margin-top:12px;">Ver todos</a>
+            {% else %}
+                <p style="font-size:15px;">Aún no hay estudiantes registrados.</p>
+                <p style="font-size:13px; color:#aaa; margin-top:8px;">Los estudiantes se crean automáticamente al registrar matrículas.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

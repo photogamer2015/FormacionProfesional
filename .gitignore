@@ -1,0 +1,59 @@
+# ─── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# ─── Entornos virtuales ──────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env
+.envrc
+
+# ─── Django ──────────────────────────────────────────────────────────
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+static_root/
+
+# Migraciones: se SUBEN al repositorio (Django las necesita en producción).
+# Si quisieras ignorarlas (NO recomendado), descomenta la siguiente línea:
+# academia/migrations/00*.py
+
+# ─── Editor/IDE ──────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ─── Sistema operativo ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Cobertura y tests ───────────────────────────────────────────────
+htmlcov/
+.coverage
+.coverage.*
+.cache/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+
+# ─── Archivos temporales del proyecto ───────────────────────────────
+*.bak
+*.tmp
+*.zip
+__MACOSX/

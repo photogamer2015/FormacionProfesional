@@ -1,0 +1,585 @@
+{% extends 'base.html' %}
+
+{% block title %}Bienvenido — Formación Profesional EC{% endblock %}
+
+{% block content %}
+
+<style>
+    :root {
+        --primary: #1a237e;
+        --secondary: #2e7d32;
+        --accent: #FFD700;
+        --danger: #c62828;
+        --bg: #f5f7fb;
+        --card-bg: #ffffff;
+        --text-main: #1f2937;
+        --text-muted: #6b7280;
+    }
+
+    /* ── Dark mode overrides (bienvenida) ── */
+    body.dark-mode {
+        --primary: #90caf9;
+        --card-bg: #1e1e1e;
+        --text-main: #e0e0e0;
+        --text-muted: #aaa;
+    }
+    body.dark-mode .card-box {
+        background: var(--card-bg);
+        border-color: #333;
+        color: var(--text-main);
+    }
+    body.dark-mode .card-title,
+    body.dark-mode .card-number,
+    body.dark-mode .logo-title {
+        color: #90caf9;
+    }
+    body.dark-mode .card-box:hover {
+        box-shadow: 0 12px 28px rgba(0,0,0,0.4);
+    }
+    body.dark-mode .status-ok {
+        background: #1b3a1c;
+        color: #81c784;
+    }
+
+    body {
+        background-color: var(--bg);
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+    }
+
+    .page-title {
+        font-weight: 700;
+        color: var(--primary);
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    /* HEADER */
+    .dashboard-header {
+        text-align: center;
+        margin-bottom: 50px;
+    }
+
+    /* LOGO */
+    .logo-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 15px;
+    }
+
+    .logo-icon {
+        width: 42px;
+        height: 42px;
+        background: linear-gradient(135deg, #1a237e, #3949ab);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 18px;
+    }
+
+    .logo-text {
+        text-align: left;
+    }
+
+    .logo-title {
+        font-weight: 700;
+        color: #1a237e;
+        font-size: 16px;
+    }
+
+    .logo-sub {
+        font-size: 11px;
+        color: #777;
+    }
+
+    /* GRID */
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 24px;
+    }
+
+    /* TARJETAS */
+    .card-box {
+        background: var(--card-bg);
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+        transition: all 0.2s ease;
+        border: 1px solid #eee;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .card-box:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .card-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--primary);
+    }
+
+    .card-icon {
+        font-size: 22px;
+        opacity: 0.85;
+    }
+
+    .card-desc {
+        margin-top: 8px;
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.5;
+    }
+
+    .card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 14px;
+    }
+
+    .status-ok {
+        background: #e8f5e9;
+        color: var(--secondary);
+        font-size: 11px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-weight: 600;
+    }
+
+    .card-number {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--primary);
+    }
+
+    /* ALERTA */
+    .alert-box {
+        margin-top: 32px;
+        text-align: center;
+        padding: 24px;
+        background: #fff8e1;
+        border-radius: 10px;
+        color: #856404;
+    }
+</style>
+<div class="dashboard-header">
+    <h2 class="page-title" style="font-size: 30px;">
+        <span id="saludo-dinamico">Hola</span>, {{ usuario.first_name|default:usuario.username }}
+    </h2>
+
+    <p class="page-subtitle">
+        Sistema de Gestión Académica
+        {% if es_admin %}
+        — <strong style="color:var(--primary);">Administrador</strong>
+        {% elif es_asesor %}
+        — <strong style="color:var(--secondary);">Asesor</strong>
+        {% endif %}
+    </p>
+</div>
+
+{# ─── Alertas de pago pendiente del módulo 1 ─────────────── #}
+{% if alertas_pago %}
+<style>
+    .alertas-banner {
+        background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+        border-left: 5px solid #e65100;
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-bottom: 28px;
+        box-shadow: 0 4px 14px rgba(230, 81, 0, 0.12);
+    }
+    body.dark-mode .alertas-banner {
+        background: linear-gradient(135deg, #3d2818 0%, #4a2f1a 100%);
+        border-left-color: #ff9800;
+    }
+    .alertas-banner h3 {
+        margin: 0 0 4px 0;
+        color: #bf360c;
+        font-size: 18px;
+        font-weight: 700;
+    }
+    body.dark-mode .alertas-banner h3 { color: #ffab40; }
+    .alertas-banner .resumen {
+        font-size: 13px;
+        color: #5d4037;
+        margin-bottom: 14px;
+    }
+    body.dark-mode .alertas-banner .resumen { color: #d7ccc8; }
+
+    .alerta-card {
+        background: white;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-top: 10px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        border: 1px solid #ffe0b2;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+    }
+    body.dark-mode .alerta-card {
+        background: #2d2018;
+        border-color: #5d4037;
+        color: #e0e0e0;
+    }
+    .alerta-card .est-nombre {
+        font-weight: 700;
+        color: #1a237e;
+        font-size: 15px;
+    }
+    body.dark-mode .alerta-card .est-nombre { color: #90caf9; }
+    .alerta-card .est-meta {
+        font-size: 12px;
+        color: #666;
+        margin-top: 2px;
+    }
+    body.dark-mode .alerta-card .est-meta { color: #bbb; }
+    .alerta-card .est-detalle {
+        font-size: 12px;
+        margin-top: 6px;
+        color: #444;
+    }
+    body.dark-mode .alerta-card .est-detalle { color: #d0d0d0; }
+    .alerta-card .badge-atraso {
+        display: inline-block;
+        background: #c62828;
+        color: white;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 12px;
+        margin-left: 6px;
+    }
+    .alerta-card .acciones {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .alerta-card .acciones .btn {
+        font-size: 12px;
+        padding: 6px 12px;
+    }
+    .btn-whatsapp {
+        background: #25d366 !important;
+        color: white !important;
+        border: none !important;
+    }
+    .btn-whatsapp:hover { background: #1ebe5a !important; }
+    .btn-revisado {
+        background: #757575 !important;
+        color: white !important;
+        border: none !important;
+    }
+    .btn-revisado:hover { background: #616161 !important; }
+
+    @media (max-width: 640px) {
+        .alerta-card {
+            grid-template-columns: 1fr;
+        }
+        .alerta-card .acciones { justify-content: flex-start; }
+    }
+
+    /* Toggle plegar/desplegar */
+    .alertas-banner details > summary {
+        cursor: pointer;
+        list-style: none;
+        font-size: 13px;
+        color: #bf360c;
+        font-weight: 600;
+        margin-top: 8px;
+    }
+    body.dark-mode .alertas-banner details > summary { color: #ffab40; }
+    .alertas-banner details > summary::-webkit-details-marker { display: none; }
+</style>
+
+<div class="alertas-banner">
+    <h3>⚠️ Gestión de Matrículas: {{ alertas_pago|length }} caso{{ alertas_pago|length|pluralize }} por revisar</h3>
+    <div class="resumen">
+        Se han identificado estudiantes que iniciaron clases recientemente y mantienen pendientes en su registro. 
+        Utilice los botones para coordinar el pago o consultar sobre su asistencia.
+    </div>
+
+    {% for a in alertas_pago|slice:":3" %}
+    <div class="alerta-card">
+        <div>
+            <div class="est-nombre">
+                {{ a.estudiante.apellidos }} {{ a.estudiante.nombres }}
+                <span class="badge-atraso">Seguimiento: {{ a.dias_atraso }} día{{ a.dias_atraso|pluralize }}</span>
+            </div>
+            <div class="est-meta">
+                {{ a.estudiante.cedula }} · {{ a.curso.nombre }} · {{ a.tipo_matricula_label }}
+            </div>
+            <div class="est-detalle">
+                📅 Jornada: <strong>{{ a.fecha_inicio_jornada|date:"d/m/Y" }}</strong>
+                · 📌 Estado: <strong style="color:#c62828;">Pendiente de pago (Módulo 1)</strong>
+                {% if a.celular %} · 📱 {{ a.celular }}{% endif %}
+            </div>
+        </div>
+        <div class="acciones">
+            {% if a.celular_wa %}
+            <a href="https://wa.me/{{ a.celular_wa }}?text=Mi+estimado%2Fa+{{ a.estudiante.nombres|urlencode }}%2C+le+saluda+Formaci%C3%B3n+Profesional+EC.+Nos+comunicamos+con+usted+para+coordinar+los+detalles+pendientes+de+su+inscripci%C3%B3n+en+el+curso+de+{{ a.curso.nombre|urlencode }}.+%C2%BFPodr%C3%ADa+ayudarnos+confirmando+su+pago%3F+Quedamos+atentos.+%F0%9F%99%8F"
+               target="_blank" rel="noopener"
+               class="btn btn-sm btn-whatsapp" title="Notificar pago pendiente">
+                💬 Pago
+            </a>
+            <a href="https://wa.me/{{ a.celular_wa }}?text=Mi+estimado%2Fa+{{ a.estudiante.nombres|urlencode }}%2C+le+saluda+Formaci%C3%B3n+Profesional+EC.+Notamos+que+no+asisti%C3%B3+a+su+clase+del+d%C3%ADa+de+hoy+del+curso+{{ a.curso.nombre|urlencode }}.+%C2%BFSucedi%C3%B3+alg%C3%BAn+inconveniente%3F+Quedamos+atentos.+%F0%9F%99%8F"
+               target="_blank" rel="noopener"
+               class="btn btn-sm btn-whatsapp" style="background:#075e54 !important;" title="Notificar inasistencia">
+                🚫 Asistencia
+            </a>
+            {% endif %}
+            <a href="{% url 'academia:matricula_abonos' a.matricula.pk %}"
+               class="btn btn-sm btn-secondary" title="Ver detalle del estudiante">
+                👁 Detalle
+            </a>
+            <form method="post" action="{% url 'academia:alerta_marcar_revisada' a.matricula.pk %}"
+                  style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="numero_modulo" value="1">
+                <input type="hidden" name="next" value="/bienvenida/">
+                <button type="submit" class="btn btn-sm btn-revisado"
+                        title="Ya gestioné este caso, ocultar hasta mañana"
+                        onclick="return confirm('¿Marcar esta alerta como ya revisada por hoy?');">
+                    ✓ Ya revisado
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if alertas_pago|length > 3 %}
+    <details>
+        <summary>▾ Ver {{ alertas_pago|length|add:"-3" }} alerta{{ alertas_pago|length|add:"-3"|pluralize }} más</summary>
+        {% for a in alertas_pago|slice:"3:" %}
+        <div class="alerta-card">
+            <div>
+                <div class="est-nombre">
+                    {{ a.estudiante.apellidos }} {{ a.estudiante.nombres }}
+                    <span class="badge-atraso">{{ a.dias_atraso }} día{{ a.dias_atraso|pluralize }} de atraso</span>
+                </div>
+                <div class="est-meta">
+                    {{ a.estudiante.cedula }} · {{ a.curso.nombre }} · {{ a.tipo_matricula_label }}
+                </div>
+                <div class="est-detalle">
+                    📅 Inició jornada el <strong>{{ a.fecha_inicio_jornada|date:"d/m/Y" }}</strong>
+                    · 💰 Falta <strong style="color:#c62828;">${{ a.saldo_m1|floatformat:2 }}</strong> del Módulo 1
+                    (pagado ${{ a.pagado_m1|floatformat:2 }} de ${{ a.valor_m1|floatformat:2 }})
+                    {% if a.celular %} · 📱 {{ a.celular }}{% endif %}
+                </div>
+            </div>
+            <div class="acciones">
+                {% if a.celular_wa %}
+                <a href="https://wa.me/{{ a.celular_wa }}?text=Mi+estimado%2Fa+{{ a.estudiante.nombres|urlencode }}%2C+le+saluda+Formaci%C3%B3n+Profesional+EC.+Nos+comunicamos+con+usted+para+coordinar+los+detalles+pendientes+de+su+inscripci%C3%B3n+en+el+curso+de+{{ a.curso.nombre|urlencode }}.+%C2%BFPodr%C3%ADa+ayudarnos+confirmando+su+pago%3F+Quedamos+atentos.+%F0%9F%99%8F"
+                   target="_blank" rel="noopener"
+                   class="btn btn-sm btn-whatsapp" title="Notificar pago pendiente">
+                    💬 Pago
+                </a>
+                <a href="https://wa.me/{{ a.celular_wa }}?text=Mi+estimado%2Fa+{{ a.estudiante.nombres|urlencode }}%2C+le+saluda+Formaci%C3%B3n+Profesional+EC.+Notamos+que+no+asisti%C3%B3+a+su+clase+del+d%C3%ADa+de+hoy+del+curso+{{ a.curso.nombre|urlencode }}.+%C2%BFSucedi%C3%B3+alg%C3%BAn+inconveniente%3F+Quedamos+atentos.+%F0%9F%99%8F"
+                   target="_blank" rel="noopener"
+                   class="btn btn-sm btn-whatsapp" style="background:#075e54 !important;" title="Notificar inasistencia">
+                    🚫 Asistencia
+                </a>
+                {% endif %}
+                <a href="{% url 'academia:matricula_abonos' a.matricula.pk %}"
+                   class="btn btn-sm btn-secondary" title="Ver detalle del estudiante">
+                    👁 Detalle
+                </a>
+                <form method="post" action="{% url 'academia:alerta_marcar_revisada' a.matricula.pk %}"
+                      style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="numero_modulo" value="1">
+                    <input type="hidden" name="next" value="/bienvenida/">
+                    <button type="submit" class="btn btn-sm btn-revisado"
+                            title="Ya gestioné este caso, ocultar hasta mañana"
+                            onclick="return confirm('¿Marcar esta alerta como ya revisada por hoy?');">
+                        ✓ Ya revisado
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </details>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="dashboard-grid">
+
+    {% if puede_gestionar_matriculas %}
+    <a href="{% url 'academia:matricula_menu' modalidad='presencial' %}" class="card-box">
+        <div class="card-header">
+            <div class="card-title">Registro de Matrículas</div>
+            <div class="card-icon">🎓</div>
+        </div>
+        <div class="card-desc">
+            Registro, edición y consulta de matrículas presenciales y online.
+        </div>
+        <div class="card-footer">
+            <span class="status-ok">Disponible</span>
+            <span>Ingresar →</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if puede_gestionar_matriculas %}
+    <a href="{% url 'academia:estudiantes_lista' %}" class="card-box">
+        <div class="card-header">
+            <div class="card-title">Estudiantes</div>
+            <div class="card-icon">👥</div>
+        </div>
+        <div class="card-desc">
+            Directorio completo con historial y exportación Excel.
+        </div>
+        <div class="card-footer">
+            <span class="status-ok">Disponible</span>
+            <span>Ingresar →</span>
+        </div>
+    </a>
+    {% endif %}
+
+    <a href="{% url 'academia:cursos_lista' modalidad='presencial' %}" class="card-box">
+        <div class="card-header">
+            <div class="card-title">Cursos Disponibles</div>
+        </div>
+        <div class="card-desc">
+            {% if es_admin %}
+            Gestión completa de cursos presenciales.
+            {% else %}
+            Consulta de cursos y horarios.
+            {% endif %}
+        </div>
+        <div class="card-footer">
+            <span class="status-ok">Disponible</span>
+            <span class="card-number">Total: {{ stats.total_cursos_presencial }}</span>
+            <span> →</span>
+        </div>
+    </a>
+
+
+    {% if puede_gestionar_matriculas %}
+    <a href="{% url 'academia:pagos_lista' %}" class="card-box">
+        <div class="card-header">
+            <div class="card-title">Pagos</div>
+            <div class="card-icon">💳</div>
+        </div>
+        <div class="card-desc">
+            Control de pagos, estados y reportes.
+        </div>
+        <div class="card-footer">
+            <span class="status-ok">Disponible</span>
+            <span>Ingresar →</span>
+        </div>
+    </a>
+
+    <a href="{% url 'academia:historial_lista' %}" class="card-box">
+        <div class="card-header">
+            <div class="card-title">Historial</div>
+            <div class="card-icon">📚</div>
+        </div>
+        <div class="card-desc">
+            Matrículas organizadas por año y mes.
+        </div>
+        <div class="card-footer">
+            <span class="status-ok">Disponible</span>
+            <span>Ingresar →</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if puede_gestionar_matriculas %}
+    <a href="{% url 'academia:adicional_menu' %}" class="card-box">
+        <div class="card-header">
+            <div class="card-title">Adicional</div>
+            <div class="card-icon">➕</div>
+        </div>
+        <div class="card-desc">
+            Certificados, examen supletorio y camisas extra.
+            Para estudiantes internos y personas externas.
+        </div>
+        <div class="card-footer">
+            <span class="status-ok">Disponible</span>
+            <span>Ingresar →</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if es_admin %}
+    <a href="{% url 'academia:admin_dashboard' %}" class="card-box">
+        <div class="card-header">
+            <div class="card-title">Registro Administrativo</div>
+            <div class="card-icon">📊</div>
+        </div>
+        <div class="card-desc">
+            Control financiero mensual con métricas.
+        </div>
+        <div class="card-footer">
+            <span class="status-ok">Admin</span>
+            <span>🔒</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if puede_gestionar_matriculas %}
+    <a href="{% url 'academia:ayuda' %}" class="card-box">
+        <div class="card-header">
+            <div class="card-title">Ayuda</div>
+            <div class="card-icon">❓</div>
+        </div>
+        <div class="card-desc">
+            Manuales y soporte del sistema.
+        </div>
+        <div class="card-footer">
+            <span class="status-ok">Disponible</span>
+            <span>Ingresar →</span>
+        </div>
+    </a>
+    {% endif %}
+</div>
+
+{% if not puede_gestionar_matriculas and not es_admin %}
+<div class="alert-box">
+    ⚠ Tu usuario no tiene rol asignado. Solicita acceso a un administrador.
+</div>
+{% endif %}
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Obtenemos la hora actual del navegador del usuario (0 - 23)
+        const horaActual = new Date().getHours();
+        const elementoSaludo = document.getElementById("saludo-dinamico");
+        
+        let saludo = "Hola"; // Saludo por defecto
+        
+        if (horaActual >= 5 && horaActual < 12) {
+            saludo = "Buenos días ☀️";
+        } else if (horaActual >= 12 && horaActual < 19) {
+            saludo = "Buenas tardes 🌤️";
+        } else {
+            saludo = "Buenas noches 🌙";
+        }
+        
+        // Reemplazamos el texto en la pantalla
+        elementoSaludo.innerText = saludo;
+    });
+</script>
+
+{% endblock %}

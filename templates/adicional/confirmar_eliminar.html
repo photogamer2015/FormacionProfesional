@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar adicional{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:adicional_lista' %}">Adicionales</a> &nbsp;›&nbsp; Eliminar
+</div>
+
+<div class="card-box" style="max-width:520px; padding:28px; margin-top:14px;">
+    <h2 style="color:#c62828; font-size:18px;">⚠ Confirmar eliminación</h2>
+    <p style="margin-top:10px;">
+        ¿Estás seguro que deseas eliminar este adicional?
+    </p>
+    <div style="background:#fff8e1; border-left:4px solid #f0ad4e; padding:14px; border-radius:8px; margin-top:14px;">
+        <div style="font-weight:600;">{{ adicional.tipo_icono }} {{ adicional.get_tipo_adicional_display }}</div>
+        <div style="font-size:13px; color:#666; margin-top:4px;">
+            {{ adicional.persona_nombre }} · {{ adicional.fecha|date:"d/m/Y" }} · <strong>${{ adicional.valor|floatformat:2 }}</strong>
+        </div>
+    </div>
+
+    <form method="post" style="margin-top:20px; display:flex; gap:8px; justify-content:flex-end;">
+        {% csrf_token %}
+        <a href="{% url 'academia:adicional_lista' %}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-danger">🗑 Eliminar definitivamente</button>
+    </form>
+</div>
+{% endblock %}

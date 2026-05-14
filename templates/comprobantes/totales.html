@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Totales de Venta — Ranking{% endblock %}
+
+{% block content %}
+<h2 class="page-title">🏆 Totales de Venta</h2>
+<p class="page-subtitle">
+    Ranking de asesoras por número de ventas y monto total.
+    Mira quién va liderando el equipo.
+</p>
+
+{# ─── Filtros de fechas ─── #}
+<div class="card-box" style="margin-bottom:18px; padding:16px;">
+    <form method="get" style="display:grid; grid-template-columns: 1fr 1fr auto auto; gap:10px; align-items:end;">
+        <div>
+            <label class="form-label" style="font-size:11px;">Desde</label>
+            <input type="date" name="desde" value="{{ filtros.desde }}" class="form-input">
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Hasta</label>
+            <input type="date" name="hasta" value="{{ filtros.hasta }}" class="form-input">
+        </div>
+        <div><button type="submit" class="btn btn-primary btn-sm">Filtrar</button></div>
+        <div><a href="{% url 'academia:comprobante_totales' %}" class="btn btn-secondary btn-sm">Limpiar</a></div>
+    </form>
+</div>
+
+
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:24px;">
+    <div class="card-box" style="border-top:4px solid #1a237e; padding:16px;">
+        <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">TOTAL VENTAS</div>
+        <div style="font-size:26px; font-weight:700; color:#1a237e; margin-top:4px;">{{ total_ventas }}</div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">Comprobantes</div>
+    </div>
+    <div class="card-box" style="border-top:4px solid #FFD700; padding:16px;">
+        <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">TOTAL GENERAL</div>
+        <div style="font-size:22px; font-weight:700; color:#1a237e; margin-top:4px;">${{ total_general|floatformat:2 }}
+        </div>
+    </div>
+</div>
+
+<div style="display:grid; grid-template-columns: 2fr 1fr; gap:20px;">
+
+    {# ─── Ranking de asesoras ─── #}
+    <div>
+        <h3 style="font-size:18px; color:#1a237e; margin-bottom:12px;">🥇 Ranking de Asesoras</h3>
+
+        {% if ranking %}
+        <div class="card-box" style="padding: 0; overflow: hidden;">
+            {% for r in ranking %}
+            <div
+                style="display:flex; align-items:center; padding:16px 20px; gap:16px;
+                        {% if not forloop.last %}border-bottom:1px solid #f0f0f0;{% endif %}
+                        {% if forloop.counter == 1 %}background: linear-gradient(90deg, #fff8e1 0%, white 100%);{% endif %}">
+
+                {# Posición #}
+                <div style="
+                    width: 44px; height: 44px; border-radius: 50%;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 18px; font-weight: 700; flex-shrink: 0;
+                    {% if forloop.counter == 1 %}background: #FFD700; color: #1a237e;
+                    {% elif forloop.counter == 2 %}background: #cfd8dc; color: #455a64;
+                    {% elif forloop.counter == 3 %}background: #ffccbc; color: #bf360c;
+                    {% else %}background: #e0e0e0; color: #666;{% endif %}">
+                    {% if forloop.counter == 1 %}🥇
+                    {% elif forloop.counter == 2 %}🥈
+                    {% elif forloop.counter == 3 %}🥉
+                    {% else %}{{ forloop.counter }}{% endif %}
+                </div>
+
+                {# Datos #}
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-size:15px; font-weight:600; color:#1a237e;">
+                        {{ r.nombre }}
+                    </div>
+                    <div style="font-size:12px; color:#666; margin-top:2px;">
+                        {{ r.num_ventas }} venta{{ r.num_ventas|pluralize }}
+                    </div>
+                </div>
+
+                {# Total #}
+                <div style="text-align:right; flex-shrink: 0;">
+                    <div style="font-size:11px; color:#888;">TOTAL</div>
+                    <div style="font-size:18px; font-weight:700; color:#1a237e;">
+                        ${{ r.total_general|floatformat:2 }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No hay ventas registradas en el rango seleccionado.</p>
+            <a href="{% url 'academia:comprobante_registrar' %}" class="btn btn-primary" style="margin-top: 12px;">
+                ＋ Registrar primera venta
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    {# ─── Top cursos ─── #}
+    <div>
+        <h3 style="font-size:18px; color:#1a237e; margin-bottom:12px;">📚 Top Cursos</h3>
+
+        {% if por_curso %}
+        <div class="card-box" style="padding: 0; overflow: hidden;">
+            {% for c in por_curso %}
+            <div style="padding:12px 16px;
+                        {% if not forloop.last %}border-bottom:1px solid #f0f0f0;{% endif %}">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                    <div
+                        style="font-size:13px; font-weight:600; color:#1a237e; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;">
+                        {{ c.curso__nombre }}
+                    </div>
+                    <span class="badge" style="background:#e8eaf6; color:#1a237e;">
+                        {{ c.num_ventas }}
+                    </span>
+                </div>
+                <div style="font-size:11px; color:#666; margin-top:4px;">
+                    ${{ c.total_pago|default:"0.00"|floatformat:2 }} cobrados
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:20px;">
+            <p style="font-size:13px;">Sin datos por curso.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

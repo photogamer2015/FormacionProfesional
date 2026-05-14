@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block title %}Lista de Comprobantes{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:comprobante_menu' %}">Comprobantes</a> &nbsp;›&nbsp; Lista
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:8px;">
+    <div>
+        <h2 class="page-title">≡ Lista de Comprobantes</h2>
+        <p class="page-subtitle">
+            Total: <strong>{{ total_count }}</strong> comprobante{{ total_count|pluralize }}
+            — Cobrado: <strong>${{ suma_pago|floatformat:2 }}</strong>
+            — Por cobrar: <strong style="color:#c62828;">${{ suma_diferencia|floatformat:2 }}</strong>
+        </p>
+    </div>
+    <a href="{% url 'academia:comprobante_registrar' %}" class="btn btn-success">＋ Registrar comprobante</a>
+</div>
+
+{# ─── Filtros ─── #}
+<div class="card-box" style="margin-bottom:18px; padding:16px;">
+    <form method="get" style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; gap:10px; align-items:end;">
+        <div>
+            <label class="form-label" style="font-size:11px;">Buscar (nombre, cédula, curso…)</label>
+            <input type="text" name="q" value="{{ filtros.q }}" class="form-input" placeholder="Ej.: María, 0102030405…">
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Curso</label>
+            <select name="curso" class="form-input">
+                <option value="">Todos</option>
+                {% for c in cursos %}
+                    <option value="{{ c.id }}" {% if filtros.curso == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Modalidad</label>
+            <select name="modalidad" class="form-input">
+                <option value="">Todas</option>
+                <option value="virtual" {% if filtros.modalidad == 'virtual' %}selected{% endif %}>Virtual</option>
+                <option value="presencial" {% if filtros.modalidad == 'presencial' %}selected{% endif %}>Presencial</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Factura</label>
+            <select name="factura" class="form-input">
+                <option value="">Todas</option>
+                <option value="si" {% if filtros.factura == 'si' %}selected{% endif %}>Sí</option>
+                <option value="no" {% if filtros.factura == 'no' %}selected{% endif %}>No</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Vendedora</label>
+            <select name="vendedora" class="form-input">
+                <option value="">Todas</option>
+                {% for v in vendedoras %}
+                    <option value="{{ v.id }}" {% if filtros.vendedora == v.id|stringformat:"s" %}selected{% endif %}>
+                        {{ v.first_name|default:v.username }} {{ v.last_name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+            <a href="{% url 'academia:comprobante_lista' %}" class="btn btn-secondary btn-sm">Limpiar</a>
+        </div>
+    </form>
+</div>
+
+{# ─── Tabla ─── #}
+{% if comprobantes %}
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha insc.</th>
+                <th>Cliente</th>
+                <th>Celular</th>
+                <th>Curso</th>
+                <th>Modalidad</th>
+                <th>Jornada</th>
+                <th>Inicio</th>
+                <th>Pago</th>
+                <th>Diferencia</th>
+                <th>Tipo</th> {# <-- NUEVA COLUMNA #}
+                <th>Comprob.</th>
+                <th>Vendedora</th>
+                <th>Factura</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in comprobantes %}
+            <tr>
+                <td>{{ c.fecha_inscripcion|date:"d/m/Y" }}</td>
+                <td><strong>{{ c.nombre_persona }}</strong></td>
+                <td>{{ c.celular }}</td>
+                <td>{{ c.curso.nombre }}</td>
+                <td>
+                    {% if c.modalidad == 'virtual' %}
+                        <span class="badge badge-online">🟢 Virtual</span>
+                    {% else %}
+                        <span class="badge badge-presencial">🏫 Presencial</span>
+                    {% endif %}
+                </td>
+                <td>{{ c.jornada }}</td>
+                <td>{{ c.inicio_curso|date:"d/m/Y" }}</td>
+                <td><strong style="color:#2e7d32;">${{ c.pago_abono|floatformat:2 }}</strong></td>
+                <td>
+                    {% if c.diferencia > 0 %}
+                        <strong style="color:#c62828;">${{ c.diferencia|floatformat:2 }}</strong>
+                    {% else %}
+                        <span style="color:#2e7d32;">$0.00</span>
+                    {% endif %}
+                </td>
+                
+                {# <-- NUEVA CELDA: TIPO DE REGISTRO #}
+                <td>
+                    {% if c.tipo_registro %}
+                        <span style="background:#f3e5f5; color:#6a1b9a; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">{{ c.get_tipo_registro_display }}</span>
+                    {% else %}
+                        <span style="color:#bbb; font-size:11px;">—</span>
+                    {% endif %}
+                </td>
+
+                <td style="text-align:center;">
+                    {% if c.link_comprobante %}
+                        <a href="{{ c.link_comprobante }}" target="_blank" rel="noopener" title="Ver comprobante" style="font-size:18px; text-decoration:none;">📎</a>
+                    {% else %}
+                        <span style="color:#bbb; font-size:11px;">—</span>
+                    {% endif %}
+                </td>
+                <td>{{ c.vendedora_nombre|default:c.vendedora.username }}</td>
+                <td>
+                    {% if c.factura_realizada == 'si' %}
+                        <span class="badge badge-pagado">✓ Sí</span>
+                    {% else %}
+                        <span class="badge badge-pendiente">✗ No</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="row-actions">
+                        {% if es_admin or c.vendedora_id == user.id %}
+                            <a href="{% url 'academia:comprobante_editar' pk=c.pk %}" class="btn btn-secondary btn-sm">✏️</a>
+                        {% endif %}
+                        {% if es_admin %}
+                            <form method="post" action="{% url 'academia:comprobante_eliminar' pk=c.pk %}"
+                                  onsubmit="return false;" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="button" class="btn btn-danger btn-sm"
+                                    onclick="confirmarAccion(this.closest('form'), '¿Eliminar el comprobante de {{ c.nombre_persona|escapejs }}? Esta acción no se puede deshacer.', 'danger')">🗑</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <p style="font-size: 16px; margin-bottom: 12px;">No hay comprobantes registrados con los filtros aplicados.</p>
+    <a href="{% url 'academia:comprobante_registrar' %}" class="btn btn-primary">＋ Registrar el primero</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Ayuda y Soporte{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp; Ayuda
+</div>
+
+{# ── Cabecera con Título y Video Tutorial ── #}
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:20px; margin-bottom: 24px;">
+    <div style="flex: 1; min-width: 300px;">
+        <h2 class="page-title">Centro de Ayuda</h2>
+        <p class="page-subtitle">Manuales, tutoriales y soporte técnico para el uso del sistema. Última revisión: mayo 2026 (v2.4).</p>
+    </div>
+    
+    <div style="flex-shrink: 0;">
+        {# Bloque de video corregido #}
+        <video controls style="max-width: 380px; width: 100%; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; background: #000;">
+            <source src="{% static 'El Plan Maestro.mp4' %}" type="video/mp4">
+            Tu navegador no soporta el reproductor de video.
+        </video>
+        <p style="font-size: 11px; color: #888; text-align: center; margin-top: 6px;">
+            <i class="fas fa-play-circle"></i> Video Tutorial: Uso General del Sistema
+        </p>
+    </div>
+</div>
+
+{# ── Índice de Soporte (Tarjetas rápidas) ── #}
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 28px;">
+
+    <div class="card-box" style="padding: 18px; border-top: 4px solid #1a237e;">
+        <h3 style="font-size:16px; color:#1a237e; margin-bottom: 8px;">🎓 Matrículas</h3>
+        <p style="font-size:13px; color:#666; margin-bottom:12px; line-height:1.4;">
+            Cómo registrar nuevos estudiantes, asignar curso y jornada, aplicar descuentos y elegir el tipo de matrícula.
+        </p>
+        <a href="#ayuda-matriculas" class="btn btn-secondary btn-sm">Ver manual ↓</a>
+    </div>
+
+    <div class="card-box" style="padding: 18px; border-top: 4px solid #2e7d32;">
+        <h3 style="font-size:16px; color:#1a237e; margin-bottom: 8px;">💵 Pagos y Abonos</h3>
+        <p style="font-size:13px; color:#666; margin-bottom:12px; line-height:1.4;">
+            Registrar Abono, Pago Completo, Pago por Módulo o Clase de Recuperación. Generación automática de recibos.
+        </p>
+        <a href="#ayuda-pagos" class="btn btn-secondary btn-sm">Ver manual ↓</a>
+    </div>
+
+    <div class="card-box" style="padding: 18px; border-top: 4px solid #283593;">
+        <h3 style="font-size:16px; color:#1a237e; margin-bottom: 8px;">📊 Pagos por Módulo</h3>
+        <p style="font-size:13px; color:#666; margin-bottom:12px; line-height:1.4;">
+            La matriz de control semanal: cómo se reparte la reserva, qué significa cada color y por qué Programa Completo se ve verde.
+        </p>
+        <a href="#ayuda-por-modulo" class="btn btn-secondary btn-sm">Ver manual ↓</a>
+    </div>
+
+    <div class="card-box" style="padding: 18px; border-top: 4px solid #ef6c00;">
+        <h3 style="font-size:16px; color:#1a237e; margin-bottom: 8px;">✱ Recuperaciones</h3>
+        <p style="font-size:13px; color:#666; margin-bottom:12px; line-height:1.4;">
+            Marcar y cobrar clases por recuperar. Decidir si suman al saldo o se cobran aparte.
+        </p>
+        <a href="#ayuda-recuperaciones" class="btn btn-secondary btn-sm">Ver manual ↓</a>
+    </div>
+
+    <div class="card-box" style="padding: 18px; border-top: 4px solid #00838f;">
+        <h3 style="font-size:16px; color:#1a237e; margin-bottom: 8px;">🖨️ Hoja de Recaudación</h3>
+        <p style="font-size:13px; color:#666; margin-bottom:12px; line-height:1.4;">
+            Hoja imprimible por día y curso, lista para que el responsable cobre y firme la asistencia.
+        </p>
+        <a href="#ayuda-recaudacion" class="btn btn-secondary btn-sm">Ver manual ↓</a>
+    </div>
+
+    <div class="card-box" style="padding: 18px; border-top: 4px solid #00897b;">
+        <h3 style="font-size:16px; color:#1a237e; margin-bottom: 8px;">➕ Adicional</h3>
+        <p style="font-size:13px; color:#666; margin-bottom:12px; line-height:1.4;">
+            Certificados, examen supletorio y camisas extra para estudiantes internos o personas externas.
+        </p>
+        <a href="#ayuda-adicional" class="btn btn-secondary btn-sm">Ver manual ↓</a>
+    </div>
+
+    <div class="card-box" style="padding: 18px; border-top: 4px solid #FFD700;">
+        <h3 style="font-size:16px; color:#1a237e; margin-bottom: 8px;">🧾 Comprobantes</h3>
+        <p style="font-size:13px; color:#666; margin-bottom:12px; line-height:1.4;">
+            Registro rápido de ventas por asesora con clasificación por Central 1, 2, IA o Seguimiento.
+        </p>
+        <a href="#ayuda-comprobantes" class="btn btn-secondary btn-sm">Ver manual ↓</a>
+    </div>
+
+    <div class="card-box" style="padding: 18px; border-top: 4px solid #c62828;">
+        <h3 style="font-size:16px; color:#1a237e; margin-bottom: 8px;">🔔 Alertas y Dashboard</h3>
+        <p style="font-size:13px; color:#666; margin-bottom:12px; line-height:1.4;">
+            Alertas de Módulo 1 impago con WhatsApp y dashboard administrativo con KPIs e histórico.
+        </p>
+        <a href="#ayuda-alertas" class="btn btn-secondary btn-sm">Ver manual ↓</a>
+    </div>
+
+</div>
+
+{# ── Contenido Detallado ── #}
+
+<div id="ayuda-matriculas" class="card-box" style="padding: 24px; margin-bottom: 24px;">
+    <h3 style="font-size:18px; color:#1a237e; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+        🎓 Gestión de Matrículas
+    </h3>
+    <ul style="font-size:14px; color:#555; line-height:1.6; padding-left: 20px;">
+        <li><strong>Nuevo estudiante:</strong> Inicio → selecciona Presencial u Online → "Nueva matrícula".</li>
+        <li><strong>Tipo de matrícula:</strong> Reserva / Abono, Reserva + Módulo 1, o Programa Completo.</li>
+        <li><strong>Descuento:</strong> El valor neto se recalcula en vivo.</li>
+        <li><strong>Jornadas:</strong> Deben estar activas para que el curso aparezca en el registro.</li>
+    </ul>
+</div>
+
+<div id="ayuda-pagos" class="card-box" style="padding: 24px; margin-bottom: 24px;">
+    <h3 style="font-size:18px; color:#2e7d32; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+        💵 Registro de Pagos y Abonos
+    </h3>
+    <ul style="font-size:14px; color:#555; line-height:1.6; padding-left: 20px;">
+        <li><strong>Tipos de pago:</strong> Abono, Pago Completo, Por Módulo o Recuperación.</li>
+        <li><strong>Recibos:</strong> Se generan automáticamente si se deja el campo en blanco.</li>
+        <li><strong>Clases de Recuperación:</strong> Puedes decidir si el cobro afecta al saldo del curso o no.</li>
+    </ul>
+</div>
+
+<div id="ayuda-por-modulo" class="card-box" style="padding: 24px; margin-bottom: 24px;">
+    <h3 style="font-size:18px; color:#283593; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+        📊 Pagos por Módulo (control semanal)
+    </h3>
+    <p style="font-size:14px; color:#555; line-height:1.6; margin-bottom:10px;">
+        Es la matriz <em>estudiantes × módulos</em> que sirve para llevar el avance del curso semana a semana.
+    </p>
+    <ul style="font-size:14px; color:#555; line-height:1.6; padding-left: 20px;">
+        <li><strong>Verde (Pagado):</strong> El módulo está cubierto totalmente.</li>
+        <li><strong>Rojo (Sin pagar):</strong> Pendiente de pago. Muestra abonos parciales en gris.</li>
+        <li><strong>Regla del derrame:</strong> La reserva se aplica al primer módulo y el sobrante pasa al siguiente.</li>
+    </ul>
+</div>
+
+<div id="ayuda-recuperaciones" class="card-box" style="padding: 24px; margin-bottom: 24px;">
+    <h3 style="font-size:18px; color:#ef6c00; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+        ✱ Clases en Recuperación
+    </h3>
+    <ul style="font-size:14px; color:#555; line-height:1.6; padding-left: 20px;">
+        <li><strong>Marcar falta:</strong> Desde el detalle de abonos del estudiante.</li>
+        <li><strong>Cobro:</strong> Se puede registrar como ingreso extra (amarillo en historial) o abono al curso.</li>
+    </ul>
+</div>
+
+<div id="ayuda-recaudacion" class="card-box" style="padding: 24px; margin-bottom: 24px;">
+    <h3 style="font-size:18px; color:#00838f; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+        🖨️ Hoja de Recaudación imprimible
+    </h3>
+    <ul style="font-size:14px; color:#555; line-height:1.6; padding-left: 20px;">
+        <li><strong>Uso:</strong> Genera el formato físico para control en aula por fecha y curso.</li>
+        <li><strong>Impresión:</strong> Una hoja por curso con totales de efectivo y transferencia al final.</li>
+    </ul>
+</div>
+
+<div id="ayuda-adicional" class="card-box" style="padding: 24px; margin-bottom: 24px;">
+    <h3 style="font-size:18px; color:#00897b; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+        ➕ Adicional (Certificados, Supletorios, Camisas)
+    </h3>
+    <ul style="font-size:14px; color:#555; line-height:1.6; padding-left: 20px;">
+        <li><strong>Personas Externas:</strong> Permite registrar ventas a personas no matriculadas.</li>
+        <li><strong>Atajo:</strong> Puedes registrar un supletorio directamente desde la ficha del alumno.</li>
+    </ul>
+</div>
+
+<div id="ayuda-comprobantes" class="card-box" style="padding: 24px; margin-bottom: 24px;">
+    <h3 style="font-size:18px; color:#856404; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+        🧾 Comprobantes de Venta (Asesoras)
+    </h3>
+    <ul style="font-size:14px; color:#555; line-height:1.6; padding-left: 20px;">
+        <li><strong>Ranking:</strong> Los registros alimentan el dashboard de ventas por asesora y central.</li>
+        <li><strong>Links:</strong> Puedes pegar el enlace de la foto del comprobante para respaldo.</li>
+    </ul>
+</div>
+
+<div id="ayuda-alertas" class="card-box" style="padding: 24px; margin-bottom: 24px;">
+    <h3 style="font-size:18px; color:#c62828; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+        🔔 Alertas de pago y Dashboard administrativo
+    </h3>
+    <ul style="font-size:14px; color:#555; line-height:1.6; padding-left: 20px;">
+        <li><strong>WhatsApp:</strong> El botón de alerta genera un mensaje automático al estudiante moroso.</li>
+        <li><strong>KPIs:</strong> Resumen de ingresos, egresos y variaciones mensuales contra el mes anterior.</li>
+    </ul>
+</div>
+
+{# ── Historial de Versiones ── #}
+<div id="ayuda-novedades" class="card-box" style="padding: 24px; margin-bottom: 24px; background:#f5f7ff;">
+    <h3 style="font-size:18px; color:#1a237e; margin-bottom: 12px; border-bottom: 1px solid #d6dbf0; padding-bottom: 8px;">
+        🆕 Novedades de la versión 2.x
+    </h3>
+    <ul style="font-size:13px; color:#555; line-height:1.6; padding-left: 20px;">
+        <li><strong>v2.4 (mayo 2026):</strong> Mejora en matriz de pagos y distribución de reserva por derrame.</li>
+        <li><strong>v2.3:</strong> Inclusión de sección Adicional y KPIs de supletorios/camisas.</li>
+        <li><strong>v2.2:</strong> Columnas de asistencia y firma en reportes PDF A3.</li>
+    </ul>
+</div>
+
+<div style="background:#f5f7ff; padding: 20px; border-radius: 8px; text-align: center; margin-top: 30px; border: 1px dashed #1a237e;">
+    <h4 style="font-size:15px; color:#1a237e; margin-bottom: 6px;">¿Necesitas soporte técnico adicional?</h4>
+    <p style="font-size:13px; color:#666;">
+        Si encuentras un error o necesitas restablecer contraseñas, contacta al <strong>Administrador</strong>.
+    </p>
+</div>
+{% endblock %}

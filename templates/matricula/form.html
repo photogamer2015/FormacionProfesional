@@ -1,0 +1,1101 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:matricula_menu' modalidad=modalidad %}">Matrícula {{ modalidad_label }}</a> &nbsp;›&nbsp;
+    {% if modo == 'editar' %}Editar{% else %}Registrar{% endif %}
+</div>
+
+<h2 class="page-title">{{ titulo }}</h2>
+<p class="page-subtitle">
+    {% if modo == 'editar' %}
+    Modifica los datos de la matrícula y guarda los cambios.
+    {% else %}
+    Si la cédula ya existe, los datos del estudiante se autocompletarán al instante.
+    {% endif %}
+    <span class="badge badge-{{ modalidad }}" style="margin-left:8px;">
+        {% if modalidad == 'online' %}🟢 Online{% else %}🏫 Presencial{% endif %}
+    </span>
+</p>
+
+<form method="post" class="card-box" novalidate>
+    {% csrf_token %}
+
+    {% if mat_form.non_field_errors %}
+        <div class="flash flash-error" style="margin-bottom:16px;">
+            {{ mat_form.non_field_errors }}
+        </div>
+    {% endif %}
+    {% if est_form.non_field_errors %}
+        <div class="flash flash-error" style="margin-bottom:16px;">
+            {{ est_form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <!-- Datos del estudiante -->
+    <h3 class="form-section-title">Datos del estudiante</h3>
+    <div class="form-grid">
+        <div>
+            <label class="form-label" for="{{ est_form.cedula.id_for_label }}">
+                Cédula/ RUC *
+                <span id="cedula-status" style="margin-left:8px; font-weight:400; font-size:11px;"></span>
+            </label>
+            {{ est_form.cedula }}{{ est_form.cedula.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ est_form.apellidos.id_for_label }}">Apellidos *</label>
+            {{ est_form.apellidos }}{{ est_form.apellidos.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ est_form.nombres.id_for_label }}">Nombres *</label>
+            {{ est_form.nombres }}{{ est_form.nombres.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ est_form.edad.id_for_label }}">Edad</label>
+            {{ est_form.edad }}{{ est_form.edad.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ est_form.correo.id_for_label }}">Correo</label>
+            {{ est_form.correo }}{{ est_form.correo.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ est_form.celular.id_for_label }}">
+                Celular
+                <span id="celular-status" style="margin-left:8px; font-weight:400; font-size:11px;"></span>
+            </label>
+            {{ est_form.celular }}{{ est_form.celular.errors }}
+            <!-- Panel de estudiantes que comparten el celular (informativo, no bloquea) -->
+            <div id="celular-compartido-panel" style="display:none; margin-top:8px; padding:10px 12px; background:#FFF8E1; border-left:4px solid #F9A825; border-radius:4px;">
+                <div style="font-size:12px; font-weight:600; color:#6D4C41; margin-bottom:6px;">
+                    👥 Este número ya está registrado en otros estudiantes
+                </div>
+                <div style="font-size:11px; color:#795548; margin-bottom:8px;">
+                    Puedes seguir usando el mismo número (familiares, hijos del mismo padre, etc.)
+                    o copiar los datos de uno de ellos:
+                </div>
+                <!-- Checkbox para permitir el duplicado (envía al backend) -->
+                <label style="display:flex; align-items:flex-start; gap:8px; padding:8px 10px; background:white; border:1px dashed #F9A825; border-radius:6px; margin-bottom:10px; cursor:pointer;">
+                    {{ est_form.permitir_celular_duplicado }}
+                    <span style="font-size:12px; color:#6D4C41; font-weight:600; line-height:1.35;">
+                        ✅ Sí, es un número compartido (familia, hijos del mismo padre, etc.) — permitir usar el mismo número
+                        <span style="display:block; font-weight:400; font-size:11px; color:#8D6E63; margin-top:2px;">
+                            Marca esta casilla y el sistema permitirá guardar la matrícula aunque el número ya exista en otro estudiante.
+                        </span>
+                    </span>
+                </label>
+                <div id="celular-compartido-lista" style="display:flex; flex-direction:column; gap:6px;"></div>
+            </div>
+        </div>
+        <div>
+            <label class="form-label" for="{{ est_form.nivel_formacion.id_for_label }}">Nivel de formación</label>
+            {{ est_form.nivel_formacion }}{{ est_form.nivel_formacion.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ est_form.titulo_profesional.id_for_label }}">Título profesional</label>
+            {{ est_form.titulo_profesional }}{{ est_form.titulo_profesional.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ est_form.ciudad.id_for_label }}">Ciudad</label>
+            {{ est_form.ciudad }}{{ est_form.ciudad.errors }}
+        </div>
+    </div>
+
+    <!-- Datos de la matrícula -->
+    <h3 class="form-section-title">Datos de la matrícula</h3>
+    <div class="form-grid">
+        <div>
+            <label class="form-label" for="id_estado">
+                Estado *
+            </label>
+            {{ mat_form.estado }}{{ mat_form.estado.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="id_curso">
+                Curso *
+                <span style="color:#888; font-weight:400; font-size:11px;">(elige modalidad y busca el curso)</span>
+            </label>
+            <div class="native-course-select">
+                {{ mat_form.curso }}
+            </div>
+            <div id="curso-selector-card" class="course-selector">
+                <div class="course-mode-tabs" role="tablist" aria-label="Modalidad del curso">
+                    <button type="button" class="course-mode-tab" data-modalidad="presencial">🏫 Presencial</button>
+                    <button type="button" class="course-mode-tab" data-modalidad="online">🟢 Online</button>
+                </div>
+                <input type="search" id="curso-search" class="form-input course-search"
+                       placeholder="Buscar curso por nombre...">
+                <div id="curso-card-list" class="course-card-list">
+                    {% for curso in cursos_disponibles %}
+                    <button type="button"
+                            class="course-option"
+                            data-course-id="{{ curso.pk }}"
+                            data-course-name="{{ curso.nombre|lower }}"
+                            data-presencial="{% if curso.ofrece_presencial %}1{% else %}0{% endif %}"
+                            data-online="{% if curso.ofrece_online %}1{% else %}0{% endif %}"
+                            data-valor-presencial="{{ curso.valor_presencial|floatformat:2 }}"
+                            data-valor-online="{{ curso.valor_online|floatformat:2 }}">
+                        <span class="course-option-main">
+                            <strong>{{ curso.nombre }}</strong>
+                            {% if curso.categoria %}
+                            <small>{{ curso.categoria.nombre }}</small>
+                            {% endif %}
+                        </span>
+                        <span class="course-option-meta">
+                            {% if curso.ofrece_presencial %}
+                            <span>🏫 ${{ curso.valor_presencial|floatformat:2 }}</span>
+                            {% endif %}
+                            {% if curso.ofrece_online %}
+                            <span>🟢 ${{ curso.valor_online|floatformat:2 }}</span>
+                            {% endif %}
+                        </span>
+                    </button>
+                    {% endfor %}
+                </div>
+                <div id="curso-empty" class="course-empty" style="display:none;">
+                    No hay cursos disponibles con esa modalidad o búsqueda.
+                </div>
+            </div>
+            {{ mat_form.curso.errors }}
+            <small id="curso-categoria-hint" style="color:#888; font-size:11px;">El valor del curso y las jornadas se
+                cargan automáticamente.</small>
+            <!-- Aviso de curso ya registrado -->
+            <div id="curso-duplicado-alert" style="display:none; margin-top:8px; padding:10px 14px; background:#FFF3E0; border-left:4px solid #E65100; border-radius:4px;">
+                <span style="font-size:14px; font-weight:600; color:#BF360C;">⚠️ Curso ya registrado</span>
+                <div id="curso-duplicado-detalle" style="font-size:12px; color:#6D4C41; margin-top:4px;"></div>
+            </div>
+        </div>
+        <div>
+            <label class="form-label" for="id_tipo_matricula">
+                Matrícula *
+                <span style="color:#888; font-weight:400; font-size:11px;">(tipo de inscripción)</span>
+            </label>
+            {{ mat_form.tipo_matricula }}{{ mat_form.tipo_matricula.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ mat_form.fecha_matricula.id_for_label }}">Fecha de matrícula *</label>
+            {{ mat_form.fecha_matricula }}{{ mat_form.fecha_matricula.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="id_valor_curso">Valor del curso (USD) *</label>
+            {{ mat_form.valor_curso }}{{ mat_form.valor_curso.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="id_descuento">
+                Descuento (USD)
+                <span style="color:#888; font-weight:400; font-size:11px;">(opcional)</span>
+            </label>
+            {{ mat_form.descuento }}{{ mat_form.descuento.errors }}
+            <small style="color: #666; display: block; margin-top: 5px;">
+                Si dejas 0 o vacío, no se aplica descuento.
+            </small>
+        </div>
+        <div>
+            <label class="form-label">
+                Valor a pagar (con descuento)
+            </label>
+            <input type="text" id="id_valor_neto_display" class="form-input"
+                   readonly style="background:#fff8e1; font-weight:700; color:#1a237e;"
+                   value="$0.00">
+            <small style="color: #666; display: block; margin-top: 5px;">
+                Se calcula automáticamente: valor del curso − descuento.
+            </small>
+        </div>
+        <div>
+            <label class="form-label" for="{{ mat_form.valor_pagado.id_for_label }}">Valor pagado (USD)</label>
+            {{ mat_form.valor_pagado }}{{ mat_form.valor_pagado.errors }}
+            <small class="form-helptext-pagado" style="color: #666; display: {{ mat_form.valor_pagado.help_text|yesno:'block,none' }}; margin-top: 5px;">{{ mat_form.valor_pagado.help_text|default:'' }}</small>
+        </div>
+    </div>
+
+    <!-- Jornada -->
+    <div style="margin-top: 16px;">
+        <label class="form-label">
+            Seleccione la jornada
+            <span style="color:#888; font-weight:400; font-size:12px;">
+                (se muestran jornadas presenciales y online — la elegida define la modalidad de la matrícula)
+            </span> *
+        </label>
+        <div class="radio-group" id="jornada-group">
+            <span class="radio-empty" id="jornada-vacio">Selecciona primero un curso para ver las jornadas
+                disponibles.</span>
+            {{ mat_form.jornada }}
+        </div>
+        {{ mat_form.jornada.errors }}
+    </div>
+
+    <!-- Talla de camiseta -->
+    <div id="talla-wrapper" style="margin-top: 16px; display: none;">
+        <label class="form-label">
+            👕 Talla de camiseta
+            <span style="color:#888; font-weight:400; font-size:12px;">(solo cursos técnicos)</span>
+        </label>
+        <div class="radio-group">{{ mat_form.talla_camiseta }}</div>
+        {{ mat_form.talla_camiseta.errors }}
+    </div>
+
+    <div style="margin-top: 16px;">
+        <label class="form-label" for="{{ mat_form.observaciones.id_for_label }}">Observaciones</label>
+        {{ mat_form.observaciones }}
+    </div>
+
+    <!-- Comprobante de venta -->
+    <h3 class="form-section-title" style="margin-top:32px;">📋 Comprobante de venta</h3>
+    <div class="form-grid">
+        <div>
+            <label class="form-label" for="{{ mat_form.tipo_registro.id_for_label }}">
+                Tipo de registro *
+                <span style="color:#888; font-weight:400; font-size:11px;">(origen de la venta)</span>
+            </label>
+            {{ mat_form.tipo_registro }}{{ mat_form.tipo_registro.errors }}
+            <small id="tipo-registro-error" style="color:#c62828; font-size:12px; display:none; margin-top:4px;">
+                ⚠️ Este campo es obligatorio.
+            </small>
+        </div>
+        <div>
+            <label class="form-label" for="{{ mat_form.link_comprobante.id_for_label }}">
+                Link del comprobante de pago
+                <span style="color:#888; font-weight:400; font-size:11px;">(opcional)</span>
+            </label>
+            {{ mat_form.link_comprobante }}{{ mat_form.link_comprobante.errors }}
+        </div>
+    </div>
+
+    <div
+        style="margin-top:16px; padding:14px 16px; background:#E3F2FD; border-left:4px solid #1976D2; border-radius:4px;">
+        <div style="font-size:11px; color:#666;">🛍️ Vendedora (auto-asignada)</div>
+        <div style="font-size:16px; font-weight:600; color:#1A237E; margin-top:2px;">
+            {{ usuario_vendedora|default:"—" }}
+        </div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">
+            Esta venta queda registrada con tu usuario y aparece en el ranking de vendedoras.
+        </div>
+    </div>
+
+    <h3 class="form-section-title" style="margin-top:32px;">🧾 Factura</h3>
+    <div class="form-grid">
+        <div>
+            <label class="form-label" for="{{ mat_form.factura_realizada.id_for_label }}">¿Factura realizada? *</label>
+            {{ mat_form.factura_realizada }}{{ mat_form.factura_realizada.errors }}
+        </div>
+    </div>
+
+    <div id="datos-factura-wrap" style="margin-top:14px;">
+        <div style="font-size:13px; font-weight:600; color:#1A237E; margin-bottom:8px;">Datos para factura</div>
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="{{ mat_form.fact_nombres.id_for_label }}">Nombres</label>
+                {{ mat_form.fact_nombres }}{{ mat_form.fact_nombres.errors }}
+            </div>
+            <div>
+                <label class="form-label" for="{{ mat_form.fact_apellidos.id_for_label }}">Apellidos</label>
+                {{ mat_form.fact_apellidos }}{{ mat_form.fact_apellidos.errors }}
+            </div>
+            <div>
+                <label class="form-label" for="{{ mat_form.fact_cedula.id_for_label }}">Número de cédula / RUC</label>
+                {{ mat_form.fact_cedula }}{{ mat_form.fact_cedula.errors }}
+            </div>
+            <div>
+                <label class="form-label" for="{{ mat_form.fact_correo.id_for_label }}">Correo electrónico</label>
+                {{ mat_form.fact_correo }}{{ mat_form.fact_correo.errors }}
+            </div>
+        </div>
+        <small style="color:#888; font-size:11px; display:block; margin-top:6px;">
+            Estos datos solo son obligatorios cuando "Factura realizada" = Sí.
+        </small>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:24px; justify-content:flex-end;">
+        <a href="{% url 'academia:matricula_lista' modalidad=modalidad %}" class="btn btn-secondary">Cancelar</a>
+        <!-- CORRECCIÓN: Se quitó el onclick que llamaba a una función inexistente -->
+        <button type="submit" id="submit-btn" class="btn btn-primary">
+            {% if modo == 'editar' %}Guardar cambios{% else %}Registrar matrícula{% endif %}
+        </button>
+    </div>
+</form>
+
+<style>
+    .native-course-select {
+        position: absolute;
+        left: -9999px;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+    }
+
+    .course-selector {
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 12px;
+        background: #fafafa;
+    }
+
+    .course-mode-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+
+    .course-mode-tab {
+        border: 1px solid #d8d8d8;
+        background: white;
+        border-radius: 8px;
+        padding: 9px 10px;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        color: #444;
+    }
+
+    .course-mode-tab.active {
+        background: #1a237e;
+        border-color: #1a237e;
+        color: white;
+        box-shadow: 0 2px 8px rgba(26,35,126,0.22);
+    }
+
+    .course-search {
+        margin-bottom: 10px;
+        background: white;
+    }
+
+    .course-card-list {
+        max-height: 280px;
+        overflow-y: auto;
+        display: grid;
+        gap: 7px;
+        padding-right: 2px;
+    }
+
+    .course-option {
+        width: 100%;
+        border: 1px solid #e5e5e5;
+        background: white;
+        border-radius: 9px;
+        padding: 10px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        text-align: left;
+        cursor: pointer;
+        font: inherit;
+        transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+    }
+
+    .course-option:hover {
+        border-color: #1a237e;
+        box-shadow: 0 2px 8px rgba(26,35,126,0.12);
+    }
+
+    .course-option.selected {
+        border-color: #1a237e;
+        background: #f5f7ff;
+        box-shadow: inset 0 0 0 1px #1a237e;
+    }
+
+    .course-option-main {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .course-option-main strong {
+        color: #1a237e;
+        font-size: 13px;
+        white-space: normal;
+    }
+
+    .course-option-main small {
+        color: #777;
+        font-size: 11px;
+    }
+
+    .course-option-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 3px;
+        color: #2e7d32;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .course-empty {
+        padding: 12px;
+        text-align: center;
+        color: #888;
+        font-size: 12px;
+    }
+
+    .jornada-mod-badge {
+        display: inline-block;
+        padding: 1px 7px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-right: 6px;
+        letter-spacing: 0.4px;
+    }
+
+    .jornada-mod-presencial {
+        background: #E3F2FD;
+        color: #1565C0;
+    }
+
+    .jornada-mod-online {
+        background: #E8F5E9;
+        color: #2E7D32;
+    }
+
+    .cedula-found {
+        color: #2E7D32;
+        font-weight: 600;
+    }
+
+    .cedula-new {
+        color: #C9A227;
+        font-weight: 600;
+    }
+
+    .cedula-checking {
+        color: #888;
+    }
+
+    /* Estilos para campos requeridos dinámicos */
+    .field-required { box-shadow: 0 0 0 2px rgba(198,40,40,0.06); border-color: #c62828 !important; }
+    .req-star { color: #c62828; margin-left:6px; font-weight:700; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        // ── Elementos del DOM ──────────────
+        const cedulaInput = document.querySelector('[name="est-cedula"]') || document.querySelector('[name="cedula"]');
+        const cedulaStatus = document.getElementById('cedula-status');
+        const cursoSelect = document.querySelector('[name="mat-curso"]') || document.querySelector('[name="curso"]');
+        const valorCursoInput = document.querySelector('[name="mat-valor_curso"]') || document.querySelector('[name="valor_curso"]');
+        const descuentoInput = document.querySelector('[name="mat-descuento"]') || document.querySelector('[name="descuento"]');
+        const valorNetoDisplay = document.getElementById('id_valor_neto_display');
+        const jornadaGroup = document.getElementById('jornada-group');
+        const cursoSelectorCard = document.getElementById('curso-selector-card');
+        const cursoSearch = document.getElementById('curso-search');
+        const cursoCards = Array.from(document.querySelectorAll('.course-option'));
+        const cursoEmpty = document.getElementById('curso-empty');
+        const modalidadTabs = Array.from(document.querySelectorAll('.course-mode-tab'));
+
+        // ── Calcular valor neto (con descuento) en tiempo real ──
+        function actualizarValorNeto() {
+            if (!valorNetoDisplay) return;
+            const valor = parseFloat((valorCursoInput && valorCursoInput.value) || '0') || 0;
+            const desc = parseFloat((descuentoInput && descuentoInput.value) || '0') || 0;
+            const neto = Math.max(valor - desc, 0);
+            valorNetoDisplay.value = '$' + neto.toFixed(2);
+            // Resaltar visualmente si hay descuento
+            if (desc > 0 && desc <= valor) {
+                valorNetoDisplay.style.background = '#fff8e1';
+                valorNetoDisplay.style.color = '#1a237e';
+            } else if (desc > valor) {
+                valorNetoDisplay.style.background = '#ffebee';
+                valorNetoDisplay.style.color = '#c62828';
+            } else {
+                valorNetoDisplay.style.background = '#f5f5f5';
+                valorNetoDisplay.style.color = '#1a237e';
+            }
+        }
+        if (valorCursoInput) valorCursoInput.addEventListener('input', actualizarValorNeto);
+        if (descuentoInput) descuentoInput.addEventListener('input', actualizarValorNeto);
+        // Inicial
+        setTimeout(actualizarValorNeto, 100);
+        const jornadaVacio = document.getElementById('jornada-vacio');
+        const tallaWrapper = document.getElementById('talla-wrapper');
+        const categoriaHint = document.getElementById('curso-categoria-hint');
+        const cursoDuplicadoAlert = document.getElementById('curso-duplicado-alert');
+        const cursoDuplicadoDetalle = document.getElementById('curso-duplicado-detalle');
+
+        // Matrículas existentes del estudiante encontrado por cédula
+        let matriculasEstudiante = [];
+
+        const MODALIDAD_URL = "{{ modalidad }}";
+        let modalidadCursoActual = MODALIDAD_URL;
+        const MODO = "{{ modo }}";
+        const jornadaPreseleccionada = "{{ mat_form.jornada.value|default_if_none:'' }}";
+
+        // ── Campos obligatorios (nombres base) ──────────────
+        const CAMPOS_REQUERIDOS = [
+            { name: 'cedula', label: 'Cédula' },
+            { name: 'apellidos', label: 'Apellidos' },
+            { name: 'nombres', label: 'Nombres' },
+            { name: 'estado', label: 'Estado' },
+            { name: 'curso', label: 'Curso' },
+            { name: 'tipo_matricula', label: 'Tipo de matrícula' },
+            { name: 'fecha_matricula', label: 'Fecha de matrícula' },
+            { name: 'valor_curso', label: 'Valor del curso' },
+            { name: 'tipo_registro', label: 'Tipo de registro' },
+            { name: 'factura_realizada', label: '¿Factura realizada?' },
+        ];
+
+        // Función auxiliar para encontrar el campo con o sin prefijo
+        function obtenerElementoCampo(name) {
+            return document.querySelector(`[name="${name}"]`) ||
+                document.querySelector(`[name="est-${name}"]`) ||
+                document.querySelector(`[name="mat-${name}"]`);
+        }
+
+        function campoEstaVacio(name) {
+            const el = obtenerElementoCampo(name);
+            // Si no se encuentra en el DOM, asumimos que está vacío para que bloquee
+            if (!el) return true;
+            const val = (el.value || '').trim();
+            return val === '' || val === 'None';
+        }
+
+        function jornadaNoSeleccionada() {
+            const radios = document.querySelectorAll('[name="mat-jornada"]');
+            if (radios.length === 0) return true; // Si no hay jornadas disponibles, bloqueamos
+            return !document.querySelector('[name="mat-jornada"]:checked');
+        }
+
+        function validarCamposPrincipales() {
+            const btn = document.getElementById('submit-btn');
+            if (!btn) return;
+
+            let todosCompletos = true;
+
+            for (const { name } of CAMPOS_REQUERIDOS) {
+                if (campoEstaVacio(name)) {
+                    todosCompletos = false;
+                    break;
+                }
+            }
+
+            if (todosCompletos && jornadaNoSeleccionada()) {
+                todosCompletos = false;
+            }
+
+            btn.disabled = !todosCompletos;
+            btn.style.opacity = todosCompletos ? '1' : '0.45';
+            btn.style.cursor = todosCompletos ? 'pointer' : 'not-allowed';
+            btn.style.pointerEvents = todosCompletos ? 'auto' : 'none';
+        }
+
+        // ── Segunda capa: interceptar submit del formulario ───────────────
+        const form = document.querySelector('form[method="post"]');
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                let primerError = null;
+                const tipoError = document.getElementById('tipo-registro-error');
+                if (tipoError) tipoError.style.display = 'none';
+
+                // Limpiar bordes anteriores
+                CAMPOS_REQUERIDOS.forEach(({ name }) => {
+                    const el = obtenerElementoCampo(name);
+                    if (el) el.style.borderColor = '';
+                });
+
+                // Verificar campos
+                for (const { name, label } of CAMPOS_REQUERIDOS) {
+                    if (campoEstaVacio(name)) {
+                        const el = obtenerElementoCampo(name);
+                        if (el) {
+                            el.style.borderColor = '#c62828';
+                            el.style.borderWidth = '2px';
+                            if (!primerError) primerError = { el, label };
+                        }
+                        if (name === 'curso' && cursoSelectorCard) {
+                            cursoSelectorCard.style.borderColor = '#c62828';
+                            cursoSelectorCard.style.borderWidth = '2px';
+                            if (!primerError) primerError = { el: cursoSelectorCard, label };
+                        }
+                        // Mostrar error específico para tipo de registro
+                        if (name === 'tipo_registro' && tipoError) {
+                            tipoError.style.display = 'block';
+                        }
+                    }
+                }
+
+                if (!primerError && jornadaNoSeleccionada()) {
+                    primerError = { el: jornadaGroup, label: 'Jornada' };
+                    if (jornadaGroup) {
+                        jornadaGroup.style.borderColor = '#c62828';
+                        jornadaGroup.style.borderWidth = '2px';
+                    }
+                }
+
+                if (primerError) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (primerError.el) primerError.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    try { primerError.el.focus(); } catch (_) { }
+                    return false;
+                }
+            });
+        }
+
+        // ── Limpiar borde rojo al corregir campo ─────────────────────────
+        document.addEventListener('input', function (e) {
+            if (e.target && e.target.value) {
+                e.target.style.borderColor = '';
+                const tipoError = document.getElementById('tipo-registro-error');
+                if ((e.target.name === 'tipo_registro' || e.target.name === 'mat-tipo_registro') && tipoError) {
+                    tipoError.style.display = 'none';
+                }
+            }
+            validarCamposPrincipales();
+        });
+        document.addEventListener('change', function (e) {
+            if (e.target && e.target.value) e.target.style.borderColor = '';
+            validarCamposPrincipales();
+        });
+
+        // ── Autocompletar por cédula ──────────────────────────────────────
+        const CAMPOS_ESTUDIANTE = ['apellidos', 'nombres', 'edad', 'correo', 'celular', 'nivel_formacion', 'titulo_profesional', 'ciudad'];
+
+        function setCampoEstudiante(name, value) {
+            const el = obtenerElementoCampo(name);
+            if (!el) return;
+            if (el.tagName === 'SELECT') {
+                const opt = Array.from(el.options).find(o => String(o.value) === String(value || ''));
+                el.value = opt ? opt.value : '';
+            } else {
+                el.value = value !== null && value !== undefined ? value : '';
+            }
+        }
+        function limpiarCamposEstudiante() {
+            if (MODO === 'editar') return;
+            CAMPOS_ESTUDIANTE.forEach(c => setCampoEstudiante(c, ''));
+        }
+
+        function cursoOfreceModalidad(card, modalidad) {
+            return card && card.dataset[modalidad] === '1';
+        }
+
+        function marcarCursoVisual() {
+            const actual = cursoSelect ? String(cursoSelect.value || '') : '';
+            cursoCards.forEach(card => {
+                card.classList.toggle('selected', actual && String(card.dataset.courseId) === actual);
+            });
+        }
+
+        function filtrarCursosVisuales() {
+            const q = ((cursoSearch && cursoSearch.value) || '').trim().toLowerCase();
+            let visibles = 0;
+            cursoCards.forEach(card => {
+                const coincideModalidad = cursoOfreceModalidad(card, modalidadCursoActual);
+                const coincideTexto = !q || (card.dataset.courseName || '').includes(q);
+                const visible = coincideModalidad && coincideTexto;
+                card.style.display = visible ? 'flex' : 'none';
+                if (visible) visibles += 1;
+            });
+            if (cursoEmpty) cursoEmpty.style.display = visibles ? 'none' : 'block';
+            modalidadTabs.forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.modalidad === modalidadCursoActual);
+            });
+            marcarCursoVisual();
+        }
+
+        function limpiarCursoSeleccionado() {
+            if (!cursoSelect) return;
+            cursoSelect.value = '';
+            cursoSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            marcarCursoVisual();
+        }
+
+        function seleccionarModalidadCurso(modalidad) {
+            modalidadCursoActual = modalidad === 'online' ? 'online' : 'presencial';
+            if (cursoSelect && cursoSelect.value) {
+                const card = cursoCards.find(c => String(c.dataset.courseId) === String(cursoSelect.value));
+                if (!cursoOfreceModalidad(card, modalidadCursoActual)) {
+                    limpiarCursoSeleccionado();
+                } else {
+                    cargarDatosCurso(cursoSelect.value, null);
+                }
+            }
+            filtrarCursosVisuales();
+        }
+
+        // ── Verificar curso duplicado ─────────────────────────────────────
+        function verificarCursoDuplicado() {
+            if (!cursoDuplicadoAlert || !cursoSelect) return;
+            const cursoIdSeleccionado = cursoSelect.value;
+            if (!cursoIdSeleccionado || matriculasEstudiante.length === 0) {
+                cursoDuplicadoAlert.style.display = 'none';
+                return;
+            }
+            const duplicado = matriculasEstudiante.find(
+                m => String(m.curso_id) === String(cursoIdSeleccionado)
+            );
+            if (duplicado) {
+                cursoDuplicadoAlert.style.display = 'block';
+                cursoDuplicadoDetalle.textContent = duplicado.jornada
+                    ? `Este estudiante ya está inscrito en "${duplicado.curso_nombre}" (jornada: ${duplicado.jornada}).`
+                    : `Este estudiante ya está inscrito en "${duplicado.curso_nombre}".`;
+            } else {
+                cursoDuplicadoAlert.style.display = 'none';
+            }
+        }
+
+        let cedulaTimer = null;
+        async function buscarPorCedula(cedula) {
+            cedula = (cedula || '').trim();
+            if (!cedula || cedula.length < 4) {
+                if (cedulaStatus) cedulaStatus.textContent = '';
+                matriculasEstudiante = [];
+                if (cursoDuplicadoAlert) cursoDuplicadoAlert.style.display = 'none';
+                return;
+            }
+            if (cedulaStatus) { cedulaStatus.textContent = 'Buscando…'; cedulaStatus.className = 'cedula-checking'; }
+            try {
+                const resp = await fetch(`/api/estudiante/${encodeURIComponent(cedula)}/`);
+                const data = await resp.json();
+                if (data.ok && data.encontrado) {
+                    const e = data.estudiante;
+                    CAMPOS_ESTUDIANTE.forEach(c => setCampoEstudiante(c, e[c]));
+                    if (cedulaStatus) { cedulaStatus.textContent = '✓ Estudiante existente — datos cargados'; cedulaStatus.className = 'cedula-found'; }
+                    matriculasEstudiante = data.matriculas || [];
+                } else {
+                    limpiarCamposEstudiante();
+                    if (cedulaStatus) { cedulaStatus.textContent = '✦ Estudiante nuevo — completa los datos'; cedulaStatus.className = 'cedula-new'; }
+                    matriculasEstudiante = [];
+                    if (cursoDuplicadoAlert) cursoDuplicadoAlert.style.display = 'none';
+                }
+                verificarCursoDuplicado();
+                validarCamposPrincipales();
+            } catch (err) { console.error(err); if (cedulaStatus) cedulaStatus.textContent = ''; }
+        }
+        if (cedulaInput) {
+            cedulaInput.addEventListener('input', function () {
+                clearTimeout(cedulaTimer);
+                const valor = this.value;
+                cedulaTimer = setTimeout(() => buscarPorCedula(valor), 350);
+            });
+            if (cedulaInput.value && MODO !== 'editar') buscarPorCedula(cedulaInput.value);
+        }
+
+        // ── Aviso de celular compartido (informativo, NO bloquea) ─────────
+        const celularInput = obtenerElementoCampo('celular');
+        const celularStatus = document.getElementById('celular-status');
+        const celularPanel = document.getElementById('celular-compartido-panel');
+        const celularLista = document.getElementById('celular-compartido-lista');
+        let celularTimer = null;
+
+        function escaparHtml(texto) {
+            const div = document.createElement('div');
+            div.textContent = texto || '';
+            return div.innerHTML;
+        }
+
+        function renderEstudianteCompartido(est) {
+            const fila = document.createElement('div');
+            fila.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:white; border:1px solid #FFE0B2; border-radius:6px;';
+
+            const info = document.createElement('div');
+            info.style.cssText = 'min-width:0; flex:1;';
+            info.innerHTML = `
+                <div style="font-size:13px; font-weight:600; color:#1A237E;">
+                    ${escaparHtml(est.nombre_completo)}
+                </div>
+                <div style="font-size:11px; color:#666;">
+                    Cédula: ${escaparHtml(est.cedula)}
+                    ${est.correo ? ' · ' + escaparHtml(est.correo) : ''}
+                    ${est.ciudad ? ' · ' + escaparHtml(est.ciudad) : ''}
+                </div>
+            `;
+            fila.appendChild(info);
+
+            if (MODO !== 'editar') {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = 'Usar estos datos';
+                btn.style.cssText = 'flex:0 0 auto; padding:6px 12px; font-size:11px; font-weight:600; background:#1A237E; color:white; border:none; border-radius:6px; cursor:pointer; white-space:nowrap;';
+                btn.addEventListener('mouseenter', () => btn.style.background = '#283593');
+                btn.addEventListener('mouseleave', () => btn.style.background = '#1A237E');
+                btn.addEventListener('click', () => {
+                    if (cedulaInput) {
+                        cedulaInput.value = est.cedula;
+                        buscarPorCedula(est.cedula);
+                    }
+                    if (celularPanel) celularPanel.style.display = 'none';
+                });
+                fila.appendChild(btn);
+            }
+            return fila;
+        }
+
+        async function buscarPorCelular(celular) {
+            const limpio = (celular || '').replace(/\D/g, '');
+            if (!limpio || limpio.length < 7) {
+                if (celularStatus) celularStatus.textContent = '';
+                if (celularPanel) celularPanel.style.display = 'none';
+                return;
+            }
+            if (celularStatus) {
+                celularStatus.textContent = 'Verificando…';
+                celularStatus.className = 'cedula-checking';
+            }
+            try {
+                const cedActual = (cedulaInput && cedulaInput.value || '').trim();
+                let url = `/api/estudiantes-por-celular/${encodeURIComponent(limpio)}/`;
+                if (MODO === 'editar' && cedActual) {
+                    url += `?excluir_cedula=${encodeURIComponent(cedActual)}`;
+                }
+                const resp = await fetch(url);
+                const data = await resp.json();
+
+                if (data.ok && data.encontrados) {
+                    if (celularStatus) {
+                        const n = data.cantidad;
+                        celularStatus.textContent = n === 1
+                            ? '👥 Este número ya está en uso por 1 estudiante'
+                            : `👥 Este número ya está en uso por ${n} estudiantes`;
+                        celularStatus.className = 'cedula-new';
+                    }
+                    if (celularLista) {
+                        celularLista.innerHTML = '';
+                        data.estudiantes.forEach(est => {
+                            celularLista.appendChild(renderEstudianteCompartido(est));
+                        });
+                    }
+                    if (celularPanel) celularPanel.style.display = 'block';
+                } else {
+                    if (celularStatus) {
+                        celularStatus.textContent = '✓ Número disponible';
+                        celularStatus.className = 'cedula-found';
+                    }
+                    if (celularPanel) celularPanel.style.display = 'none';
+                }
+            } catch (err) {
+                console.error(err);
+                if (celularStatus) celularStatus.textContent = '';
+                if (celularPanel) celularPanel.style.display = 'none';
+            }
+        }
+
+        if (celularInput) {
+            celularInput.addEventListener('input', function () {
+                clearTimeout(celularTimer);
+                const valor = this.value;
+                celularTimer = setTimeout(() => buscarPorCelular(valor), 400);
+            });
+            if (celularInput.value) buscarPorCelular(celularInput.value);
+        }
+
+        // ── Talla de camiseta ─────────────────────────────────────────────
+        function mostrarTalla(visible) {
+            if (!tallaWrapper) return;
+            if (visible) tallaWrapper.style.display = 'block';
+            else {
+                tallaWrapper.style.display = 'none';
+                tallaWrapper.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+            }
+        }
+
+        // ── Carga de curso y jornadas vía AJAX ────────────────────────────
+        async function cargarDatosCurso(cursoId, preseleccionarJornada) {
+            if (!cursoId) {
+                if (jornadaGroup) jornadaGroup.querySelectorAll('label').forEach(l => l.remove());
+                if (jornadaVacio) jornadaVacio.style.display = 'block';
+                mostrarTalla(false);
+                if (categoriaHint) { categoriaHint.textContent = 'El valor del curso y las jornadas se cargan automáticamente.'; categoriaHint.style.color = '#888'; }
+                validarCamposPrincipales();
+                return;
+            }
+            let dataCurso = null;
+            try {
+                const respCurso = await fetch(`/api/curso/${cursoId}/?modalidad=${modalidadCursoActual}`);
+                dataCurso = await respCurso.json();
+                if (dataCurso.ok && valorCursoInput) {
+                    if (!valorCursoInput.value || valorCursoInput.dataset.fromCurso === '1') {
+                        valorCursoInput.value = dataCurso.curso.valor;
+                        valorCursoInput.dataset.fromCurso = '1';
+                    }
+                    if (categoriaHint) {
+                        let hint = '';
+                        if (dataCurso.curso.categoria_nombre) hint += `Categoría: <strong>${dataCurso.curso.categoria_nombre}</strong>`;
+                        const detalles = [];
+                        if (dataCurso.curso.ofrece_presencial) detalles.push(`Presencial $${dataCurso.curso.valor_presencial}`);
+                        if (dataCurso.curso.ofrece_online) detalles.push(`Online $${dataCurso.curso.valor_online}`);
+                        if (detalles.length) hint += (hint ? ' · ' : '') + detalles.join(' · ');
+                        categoriaHint.innerHTML = hint || 'Curso sin categoría asignada.';
+                        categoriaHint.style.color = '#1a237e';
+                    }
+                    mostrarTalla(!!dataCurso.curso.requiere_talla);
+                }
+            } catch (err) { console.error(err); }
+
+            try {
+                const respJor = await fetch(`/api/curso/${cursoId}/jornadas/?modalidad=${modalidadCursoActual}`);
+                const dataJor = await respJor.json();
+                const jornadasFiltradas = dataJor.jornadas;
+
+                if (jornadaGroup) jornadaGroup.querySelectorAll('label').forEach(l => l.remove());
+                if (jornadaVacio) {
+                    jornadaVacio.style.display = jornadasFiltradas.length === 0 ? 'block' : 'none';
+                    if (jornadasFiltradas.length === 0) jornadaVacio.textContent = 'Este curso no tiene jornadas disponibles. Pide a un administrador que las agregue.';
+                }
+                const jornadasOrdenadas = [...jornadasFiltradas].sort((a, b) =>
+                    a.modalidad === b.modalidad ? 0 : (a.modalidad === 'presencial' ? -1 : 1));
+                jornadasOrdenadas.forEach(j => {
+                    const lbl = document.createElement('label');
+                    lbl.style.cssText = 'display:flex; align-items:center; gap:6px; flex-wrap:wrap;';
+                    const radio = document.createElement('input');
+                    radio.type = 'radio'; radio.name = 'mat-jornada'; radio.value = j.id;
+                    radio.dataset.modalidad = j.modalidad;
+                    if (preseleccionarJornada && String(j.id) === String(preseleccionarJornada)) radio.checked = true;
+                    lbl.appendChild(radio);
+                    const badge = document.createElement('span');
+                    badge.className = 'jornada-mod-badge jornada-mod-' + j.modalidad;
+                    badge.textContent = j.modalidad === 'online' ? '🟢 Online' : '🏫 Presencial';
+                    lbl.appendChild(badge);
+                    const span = document.createElement('span');
+                    const partes = [j.descripcion];
+                    if (j.fecha) partes.push(j.fecha);
+                    if (j.hora_inicio && j.hora_fin) partes.push(`${j.hora_inicio} a ${j.hora_fin}`);
+                    if (j.ciudad) partes.push(`(${j.ciudad})`);
+                    span.textContent = partes.join(' · ');
+                    lbl.appendChild(span);
+                    if (jornadaGroup) jornadaGroup.appendChild(lbl);
+                });
+                if (jornadaGroup) jornadaGroup.querySelectorAll('[name="mat-jornada"]').forEach(radio => {
+                    radio.addEventListener('change', function () {
+                        if (!dataCurso || !dataCurso.ok || !valorCursoInput) return;
+                        if (valorCursoInput.dataset.fromCurso === '1') {
+                            const mod = this.dataset.modalidad;
+                            valorCursoInput.value = mod === 'online' ? dataCurso.curso.valor_online : dataCurso.curso.valor_presencial;
+                        }
+                        validarCamposPrincipales();
+                    });
+                });
+                validarCamposPrincipales();
+            } catch (err) { console.error(err); }
+        }
+
+        if (cursoSelect) {
+            cursoSelect.addEventListener('change', function () {
+                if (cursoSelectorCard && this.value) {
+                    cursoSelectorCard.style.borderColor = '';
+                    cursoSelectorCard.style.borderWidth = '';
+                }
+                cargarDatosCurso(this.value, null);
+                verificarCursoDuplicado();
+                marcarCursoVisual();
+            });
+        }
+        modalidadTabs.forEach(tab => {
+            tab.addEventListener('click', () => seleccionarModalidadCurso(tab.dataset.modalidad));
+        });
+        if (cursoSearch) {
+            cursoSearch.addEventListener('input', filtrarCursosVisuales);
+        }
+        cursoCards.forEach(card => {
+            card.addEventListener('click', () => {
+                if (!cursoSelect) return;
+                modalidadCursoActual = card.dataset.online === '1' && modalidadCursoActual === 'online'
+                    ? 'online'
+                    : (card.dataset.presencial === '1' ? 'presencial' : 'online');
+                cursoSelect.value = card.dataset.courseId;
+                cursoSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                filtrarCursosVisuales();
+            });
+        });
+        if (valorCursoInput) {
+            valorCursoInput.addEventListener('input', () => valorCursoInput.dataset.fromCurso = '0');
+        }
+        if (cursoSelect && cursoSelect.value) {
+            const selectedCard = cursoCards.find(c => String(c.dataset.courseId) === String(cursoSelect.value));
+            if (selectedCard && selectedCard.dataset.online === '1' && selectedCard.dataset.presencial !== '1') {
+                modalidadCursoActual = 'online';
+            }
+            cargarDatosCurso(cursoSelect.value, jornadaPreseleccionada);
+        }
+        filtrarCursosVisuales();
+
+        // ── Toggle visual de "datos de factura" y gestión de requisitos ───
+        const facturaSelect = obtenerElementoCampo('factura_realizada');
+        const datosFacturaWrap = document.getElementById('datos-factura-wrap');
+
+        const INVOICE_FIELDS = [
+            { name: 'fact_nombres', label: 'Nombres (factura)' },
+            { name: 'fact_apellidos', label: 'Apellidos (factura)' },
+            { name: 'fact_cedula', label: 'Cédula / RUC (factura)' },
+            { name: 'fact_correo', label: 'Correo (factura)' },
+        ];
+
+        function isFacturaSi() {
+            const checked = document.querySelector('[name="factura_realizada"]:checked');
+            if (checked) return checked.value === 'si';
+            if (facturaSelect) return facturaSelect.value === 'si';
+            return false;
+        }
+
+        function setInvoiceRequired(required) {
+            INVOICE_FIELDS.forEach(f => {
+                const el = obtenerElementoCampo(f.name);
+                if (!el) return;
+                const lbl = el.id ? document.querySelector(`label[for="${el.id}"]`) : null;
+                if (required) {
+                    el.setAttribute('required', 'required');
+                    el.classList.add('field-required');
+                    if (lbl && !lbl.querySelector('.req-star')) {
+                        const span = document.createElement('span');
+                        span.className = 'req-star';
+                        span.textContent = ' *';
+                        lbl.appendChild(span);
+                    }
+                } else {
+                    el.removeAttribute('required');
+                    el.classList.remove('field-required');
+                    el.style.borderColor = '';
+                    if (lbl) {
+                        const star = lbl.querySelector('.req-star');
+                        if (star) star.remove();
+                    }
+                }
+            });
+
+            if (required) {
+                INVOICE_FIELDS.forEach(f => {
+                    if (!CAMPOS_REQUERIDOS.find(c => c.name === f.name)) {
+                        CAMPOS_REQUERIDOS.push({ name: f.name, label: f.label });
+                    }
+                });
+            } else {
+                for (let i = CAMPOS_REQUERIDOS.length - 1; i >= 0; i--) {
+                    if (INVOICE_FIELDS.find(x => x.name === CAMPOS_REQUERIDOS[i].name)) {
+                        CAMPOS_REQUERIDOS.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        function toggleDatosFactura() {
+            if (!datosFacturaWrap) return;
+            const si = isFacturaSi();
+            datosFacturaWrap.style.opacity = si ? '1' : '0.65';
+            setInvoiceRequired(si);
+            validarCamposPrincipales();
+        }
+
+        // Escuchar cambios (soporta radios o selects)
+        const facturaEls = document.querySelectorAll('[name="factura_realizada"]');
+        if (facturaEls && facturaEls.length) {
+            facturaEls.forEach(e => e.addEventListener('change', toggleDatosFactura));
+        } else if (facturaSelect) {
+            facturaSelect.addEventListener('change', toggleDatosFactura);
+        }
+        // Inicializar estado
+        toggleDatosFactura();
+
+        // ── Validar al cargar ─────────────────────────────────────────────
+        validarCamposPrincipales();
+    })();
+</script>
+{% endblock %}

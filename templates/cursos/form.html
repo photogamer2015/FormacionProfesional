@@ -1,0 +1,833 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* ─── Selector de categoría custom ─── */
+    .cat-picker {
+        position: relative;
+    }
+    .cat-picker-trigger {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 14px;
+        border: 1px solid #d0d4e0;
+        border-radius: 8px;
+        background: white;
+        cursor: pointer;
+        font-size: 14px;
+        color: #333;
+        transition: all 0.15s;
+        min-height: 42px;
+    }
+    .cat-picker-trigger:hover {
+        border-color: #1a237e;
+    }
+    .cat-picker.open .cat-picker-trigger {
+        border-color: #1a237e;
+        box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
+    }
+    .cat-picker-selected {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+        min-width: 0;
+    }
+    .cat-picker-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .cat-picker-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .cat-picker-placeholder {
+        color: #999;
+    }
+    .cat-picker-clear {
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        line-height: 1;
+    }
+    .cat-picker-clear:hover {
+        background: #ffebee;
+        color: #c62828;
+    }
+    .cat-picker-arrow {
+        color: #888;
+        font-size: 11px;
+        transition: transform 0.15s;
+    }
+    .cat-picker.open .cat-picker-arrow {
+        transform: rotate(180deg);
+    }
+    .cat-picker-dropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #d0d4e0;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        z-index: 50;
+        max-height: 320px;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .cat-picker.open .cat-picker-dropdown {
+        display: flex;
+    }
+    .cat-picker-search {
+        position: relative;
+        padding: 10px;
+        border-bottom: 1px solid #eef0f5;
+        flex-shrink: 0;
+    }
+    .cat-picker-search input {
+        width: 100%;
+        padding: 8px 32px 8px 12px;
+        border: 1px solid #e0e3f0;
+        border-radius: 6px;
+        font-size: 13px;
+        outline: none;
+    }
+    .cat-picker-search input:focus {
+        border-color: #1a237e;
+    }
+    .cat-picker-search-clear {
+        position: absolute;
+        right: 18px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 4px 6px;
+        border-radius: 4px;
+        display: none;
+    }
+    .cat-picker-search-clear:hover {
+        background: #f0f0f0;
+        color: #333;
+    }
+    .cat-picker-search-clear.visible {
+        display: block;
+    }
+    .cat-picker-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 4px;
+    }
+    .cat-picker-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.1s;
+        font-size: 13px;
+    }
+    .cat-picker-item:hover {
+        background: #f5f7ff;
+    }
+    .cat-picker-item.selected {
+        background: #e8eaf6;
+        font-weight: 600;
+    }
+    .cat-picker-item-name {
+        flex: 1;
+        color: #333;
+    }
+    .cat-picker-item-delete {
+        background: none;
+        border: none;
+        color: #bbb;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        opacity: 0;
+        transition: all 0.15s;
+    }
+    .cat-picker-item:hover .cat-picker-item-delete {
+        opacity: 1;
+    }
+    .cat-picker-item-delete:hover {
+        background: #ffebee;
+        color: #c62828;
+    }
+    .cat-picker-empty {
+        padding: 24px 14px;
+        text-align: center;
+        color: #999;
+        font-size: 13px;
+    }
+    .cat-picker-footer {
+        border-top: 1px solid #eef0f5;
+        padding: 8px;
+        flex-shrink: 0;
+    }
+    .cat-picker-add {
+        width: 100%;
+        background: #FFD700;
+        color: #1a237e;
+        border: none;
+        padding: 9px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .cat-picker-add:hover {
+        background: #FFC107;
+    }
+    /* Esconder el select original — el JS lo sigue usando para enviar el valor */
+    #id_categoria {
+        display: none;
+    }
+
+    /* Modo oscuro */
+    body.dark-mode .cat-picker-trigger {
+        background: #2c2c2c;
+        border-color: #444;
+        color: #e0e0e0;
+    }
+    body.dark-mode .cat-picker-dropdown {
+        background: #1e1e1e;
+        border-color: #444;
+    }
+    body.dark-mode .cat-picker-search {
+        border-bottom-color: #333;
+    }
+    body.dark-mode .cat-picker-search input {
+        background: #2c2c2c;
+        border-color: #444;
+        color: #e0e0e0;
+    }
+    body.dark-mode .cat-picker-item:hover {
+        background: #2a2d3a;
+    }
+    body.dark-mode .cat-picker-item.selected {
+        background: #2d3142;
+    }
+    body.dark-mode .cat-picker-item-name {
+        color: #e0e0e0;
+    }
+    body.dark-mode .cat-picker-footer {
+        border-top-color: #333;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:cursos_lista' modalidad=modalidad_pref %}">Cursos {{ modalidad_pref|capfirst }}</a> &nbsp;›&nbsp;
+    {% if modo == 'editar' %}Editar{% else %}Nuevo{% endif %}
+</div>
+
+<h2 class="page-title">{{ titulo }}</h2>
+<p class="page-subtitle">
+    {% if modo == 'editar' %}
+        Modifica los datos del curso. Puedes activar ambas modalidades con valores distintos.
+    {% else %}
+        Crea un nuevo curso. Marca las modalidades en las que se ofrece y define el valor para cada una.
+    {% endif %}
+</p>
+
+<form method="post" class="card-box" novalidate style="max-width: 720px;">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="flash flash-error" style="margin-bottom:16px;">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <div style="margin-bottom: 16px;">
+        <label class="form-label" for="id_categoria">Categoría *</label>
+
+        {{ form.categoria }}
+
+        {# Selector custom — se rellena vía JS desde el <select> #}
+        <div class="cat-picker" id="cat-picker">
+            <div class="cat-picker-trigger" id="cat-picker-trigger" tabindex="0">
+                <div class="cat-picker-selected" id="cat-picker-selected">
+                    <span class="cat-picker-placeholder">— Selecciona categoría —</span>
+                </div>
+                <button type="button" class="cat-picker-clear" id="cat-picker-clear"
+                        title="Quitar selección" style="display:none;">✕</button>
+                <span class="cat-picker-arrow">▼</span>
+            </div>
+            <div class="cat-picker-dropdown">
+                <div class="cat-picker-search">
+                    <input type="text" id="cat-picker-search-input"
+                           placeholder="Buscar categoría…" autocomplete="off">
+                    <button type="button" class="cat-picker-search-clear"
+                            id="cat-picker-search-clear" title="Limpiar búsqueda">✕</button>
+                </div>
+                <div class="cat-picker-list" id="cat-picker-list"></div>
+                <div class="cat-picker-footer">
+                    <button type="button" class="cat-picker-add" id="cat-picker-add">
+                        + Nueva categoría
+                    </button>
+                </div>
+            </div>
+        </div>
+        {{ form.categoria.errors }}
+    </div>
+
+    <div style="margin-bottom: 16px;">
+        <label class="form-label">Nombre del curso *</label>
+        {{ form.nombre }}
+        {{ form.nombre.errors }}
+    </div>
+
+    {# ── Modalidades disponibles ───────────────────────────── #}
+    <h3 class="form-section-title">Modalidades y valores</h3>
+    <p style="font-size:12px; color:#666; margin-bottom:14px;">
+        Marca las modalidades en las que se ofrece este curso. Cada una tiene su propio valor.
+    </p>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+
+        {# Card Presencial #}
+        <div style="border:2px solid #e0e0e0; border-radius:10px; padding:16px; transition: all 0.2s;"
+             id="card-presencial">
+            <label style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; color:#1a237e; cursor:pointer; margin-bottom:10px;">
+                {{ form.ofrece_presencial }}
+                <span class="badge badge-presencial">🏫 Presencial</span>
+            </label>
+            <label class="form-label" style="font-size:12px;">Valor presencial (USD)</label>
+            {{ form.valor_presencial }}
+            {{ form.valor_presencial.errors }}
+        </div>
+
+        {# Card Online #}
+        <div style="border:2px solid #e0e0e0; border-radius:10px; padding:16px; transition: all 0.2s;"
+             id="card-online">
+            <label style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; color:#2e7d32; cursor:pointer; margin-bottom:10px;">
+                {{ form.ofrece_online }}
+                <span class="badge badge-online">🟢 Online</span>
+            </label>
+            <label class="form-label" style="font-size:12px;">Valor online (USD)</label>
+            {{ form.valor_online }}
+            {{ form.valor_online.errors }}
+        </div>
+
+    </div>
+
+    <h3 class="form-section-title">Otros datos</h3>
+    <div class="form-grid" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px;">
+        <div>
+            <label class="form-label">Duración</label>
+            {{ form.duracion }}
+            {{ form.duracion.errors }}
+        </div>
+        <div>
+            <label class="form-label">
+                Nº módulos (Presencial) *
+            </label>
+            {{ form.numero_modulos }}
+            {{ form.numero_modulos.errors }}
+            <small style="color:#666; font-size:11px;">
+                Típico: 4
+            </small>
+        </div>
+        <div>
+            <label class="form-label">
+                Nº módulos (Online) *
+            </label>
+            {{ form.numero_modulos_online }}
+            {{ form.numero_modulos_online.errors }}
+            <small style="color:#666; font-size:11px;">
+                Típico: 2
+            </small>
+        </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+        <label class="form-label">Descripción</label>
+        {{ form.descripcion }}
+    </div>
+
+    <div style="margin-top: 16px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px;">
+            {{ form.activo }} Activo
+        </label>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:24px; justify-content:flex-end;">
+        <a href="{% url 'academia:cursos_lista' modalidad=modalidad_pref %}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary">
+            {% if modo == 'editar' %}Guardar cambios{% else %}Crear curso{% endif %}
+        </button>
+    </div>
+</form>
+
+
+<!-- Modal: agregar nueva categoría -->
+<div class="modal-backdrop" id="modal-categoria" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:white; border-radius:12px; width:100%; max-width:480px; padding:28px; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+        <h3 style="color:#1a237e; margin-bottom:16px; font-size:18px;">Nueva categoría</h3>
+        <div id="modal-error" style="display:none;" class="flash flash-error"></div>
+
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+                <label class="form-label">Nombre *</label>
+                <input type="text" id="cat-nombre" class="form-input"
+                       placeholder="Ej.: Vacacionales" autofocus>
+            </div>
+            <div>
+                <label class="form-label">Descripción</label>
+                <textarea id="cat-descripcion" class="form-input" rows="2"></textarea>
+            </div>
+            <div>
+                <label class="form-label">Color</label>
+                <select id="cat-color" class="form-input">
+                    <option value="#1a237e">Azul</option>
+                    <option value="#2e7d32">Verde</option>
+                    <option value="#c62828">Rojo</option>
+                    <option value="#f0ad4e">Naranja</option>
+                    <option value="#6a1b9a">Morado</option>
+                    <option value="#00838f">Cian</option>
+                    <option value="#5d4037">Marrón</option>
+                    <option value="#455a64">Gris</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-cat">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="btn-save-cat">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: confirmar eliminar categoría -->
+<div class="modal-backdrop" id="modal-confirmar-eliminar" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1001; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:white; border-radius:12px; width:100%; max-width:440px; padding:28px; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+        <h3 style="color:#c62828; margin-bottom:12px; font-size:18px;">Eliminar categoría</h3>
+        <p id="confirm-eliminar-texto" style="font-size:14px; color:#555; line-height:1.5; margin-bottom:8px;">
+            ¿Seguro que quieres eliminar la categoría <strong id="confirm-eliminar-nombre"></strong>?
+        </p>
+        <p style="font-size:12px; color:#888; margin-bottom:16px;">
+            Si la categoría tiene cursos asignados, no podrá eliminarse hasta que los reasignes.
+        </p>
+        <div id="confirm-eliminar-error" style="display:none;" class="flash flash-error"></div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-eliminar">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="btn-confirm-eliminar"
+                    style="background:#c62828; border-color:#c62828;">Sí, eliminar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+(function() {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const categoriaSelect = document.getElementById('id_categoria');
+
+    /* ── Cards presencial / online: resaltar cuando están activas ── */
+    const chkPres = document.getElementById('id_ofrece_presencial');
+    const chkOnl = document.getElementById('id_ofrece_online');
+    const cardPres = document.getElementById('card-presencial');
+    const cardOnl = document.getElementById('card-online');
+
+    function actualizarCards() {
+        if (chkPres.checked) {
+            cardPres.style.borderColor = '#1a237e';
+            cardPres.style.background = '#f5f7ff';
+        } else {
+            cardPres.style.borderColor = '#e0e0e0';
+            cardPres.style.background = 'white';
+        }
+        if (chkOnl.checked) {
+            cardOnl.style.borderColor = '#2e7d32';
+            cardOnl.style.background = '#f1f8e9';
+        } else {
+            cardOnl.style.borderColor = '#e0e0e0';
+            cardOnl.style.background = 'white';
+        }
+    }
+    if (chkPres && chkOnl) {
+        chkPres.addEventListener('change', actualizarCards);
+        chkOnl.addEventListener('change', actualizarCards);
+        actualizarCards();
+    }
+
+    /* ════════════════════════════════════════════════════════════
+       SELECTOR CUSTOM DE CATEGORÍA
+       ════════════════════════════════════════════════════════════ */
+    const picker = document.getElementById('cat-picker');
+    const trigger = document.getElementById('cat-picker-trigger');
+    const selectedBox = document.getElementById('cat-picker-selected');
+    const clearBtn = document.getElementById('cat-picker-clear');
+    const list = document.getElementById('cat-picker-list');
+    const searchInput = document.getElementById('cat-picker-search-input');
+    const searchClear = document.getElementById('cat-picker-search-clear');
+    const addBtn = document.getElementById('cat-picker-add');
+
+    let categorias = [];   // [{id, nombre, color, descripcion}]
+    let filtro = '';
+
+    /* Lee las categorías iniciales desde el <select> server-side */
+    function leerCategoriasDelSelect() {
+        categorias = Array.from(categoriaSelect.options)
+            .filter(o => o.value)  // ignora el placeholder vacío
+            .map(o => ({
+                id: parseInt(o.value, 10),
+                nombre: o.textContent.trim(),
+                color: '#1a237e',     // se completa luego desde la API
+                descripcion: '',
+            }));
+    }
+
+    /* Carga las categorías frescas desde la API (incluye color) */
+    async function refrescarCategorias() {
+        try {
+            const resp = await fetch('{% url "academia:api_categoria_listar" %}');
+            const data = await resp.json();
+            if (data.ok) {
+                categorias = data.categorias;
+                sincronizarSelectNativo();
+                renderLista();
+                actualizarSeleccion();
+            }
+        } catch (err) {
+            // Si falla, nos quedamos con las categorías que ya leímos del <select>
+            console.warn('No se pudo refrescar la lista de categorías:', err);
+        }
+    }
+
+    /* Mantiene el <select> oculto sincronizado con la lista actual */
+    function sincronizarSelectNativo() {
+        const seleccionadaId = categoriaSelect.value;
+        const placeholder = categoriaSelect.querySelector('option[value=""]');
+        categoriaSelect.innerHTML = '';
+        if (placeholder) categoriaSelect.appendChild(placeholder);
+        else {
+            const empty = document.createElement('option');
+            empty.value = '';
+            empty.textContent = '— Selecciona categoría —';
+            categoriaSelect.appendChild(empty);
+        }
+        categorias.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.nombre;
+            categoriaSelect.appendChild(opt);
+        });
+        // Reaplicar la selección si todavía existe
+        if (seleccionadaId && categorias.some(c => c.id == seleccionadaId)) {
+            categoriaSelect.value = seleccionadaId;
+        } else {
+            categoriaSelect.value = '';
+        }
+    }
+
+    /* Renderiza la lista visible (filtrada) */
+    function renderLista() {
+        const seleccionadaId = parseInt(categoriaSelect.value, 10) || null;
+        const term = filtro.trim().toLowerCase();
+        const visibles = term
+            ? categorias.filter(c => c.nombre.toLowerCase().includes(term))
+            : categorias;
+
+        if (visibles.length === 0) {
+            list.innerHTML = '<div class="cat-picker-empty">' +
+                (term ? 'No hay categorías que coincidan con "' + escapeHtml(term) + '".'
+                      : 'Aún no hay categorías. Crea la primera.') +
+                '</div>';
+            return;
+        }
+
+        list.innerHTML = visibles.map(c => {
+            const sel = c.id === seleccionadaId ? ' selected' : '';
+            return `
+                <div class="cat-picker-item${sel}" data-id="${c.id}">
+                    <span class="cat-picker-dot" style="background:${escapeAttr(c.color)};"></span>
+                    <span class="cat-picker-item-name">${escapeHtml(c.nombre)}</span>
+                    <button type="button" class="cat-picker-item-delete"
+                            data-id="${c.id}"
+                            data-nombre="${escapeAttr(c.nombre)}"
+                            title="Eliminar categoría">🗑</button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /* Refleja la selección actual en el botón principal */
+    function actualizarSeleccion() {
+        const id = parseInt(categoriaSelect.value, 10);
+        const cat = categorias.find(c => c.id === id);
+        if (cat) {
+            selectedBox.innerHTML = `
+                <span class="cat-picker-dot" style="background:${escapeAttr(cat.color)};"></span>
+                <span class="cat-picker-name">${escapeHtml(cat.nombre)}</span>
+            `;
+            clearBtn.style.display = 'inline-block';
+        } else {
+            selectedBox.innerHTML = '<span class="cat-picker-placeholder">— Selecciona categoría —</span>';
+            clearBtn.style.display = 'none';
+        }
+    }
+
+    function abrirPicker() {
+        picker.classList.add('open');
+        renderLista();
+        setTimeout(() => searchInput.focus(), 50);
+    }
+    function cerrarPicker() {
+        picker.classList.remove('open');
+        filtro = '';
+        searchInput.value = '';
+        searchClear.classList.remove('visible');
+    }
+
+    /* Eventos del trigger principal */
+    trigger.addEventListener('click', (e) => {
+        if (e.target === clearBtn) return;
+        picker.classList.contains('open') ? cerrarPicker() : abrirPicker();
+    });
+    trigger.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            abrirPicker();
+        }
+    });
+
+    /* Botón ✕ que limpia la selección */
+    clearBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        categoriaSelect.value = '';
+        actualizarSeleccion();
+    });
+
+    /* Búsqueda dentro del dropdown */
+    searchInput.addEventListener('input', () => {
+        filtro = searchInput.value;
+        searchClear.classList.toggle('visible', filtro.length > 0);
+        renderLista();
+    });
+    searchClear.addEventListener('click', () => {
+        searchInput.value = '';
+        filtro = '';
+        searchClear.classList.remove('visible');
+        renderLista();
+        searchInput.focus();
+    });
+
+    /* Click sobre items y botones de eliminar (delegación) */
+    list.addEventListener('click', (e) => {
+        const deleteBtn = e.target.closest('.cat-picker-item-delete');
+        if (deleteBtn) {
+            e.stopPropagation();
+            pedirConfirmacionEliminar(
+                parseInt(deleteBtn.dataset.id, 10),
+                deleteBtn.dataset.nombre
+            );
+            return;
+        }
+        const item = e.target.closest('.cat-picker-item');
+        if (item) {
+            categoriaSelect.value = item.dataset.id;
+            actualizarSeleccion();
+            cerrarPicker();
+        }
+    });
+
+    /* Cerrar al hacer click fuera */
+    document.addEventListener('click', (e) => {
+        if (!picker.contains(e.target)) cerrarPicker();
+    });
+    /* Cerrar con Escape */
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && picker.classList.contains('open')) cerrarPicker();
+    });
+
+    /* ════════════════════════════════════════════════════════════
+       MODAL "NUEVA CATEGORÍA"
+       ════════════════════════════════════════════════════════════ */
+    const modal = document.getElementById('modal-categoria');
+    const errorBox = document.getElementById('modal-error');
+    const inputNombre = document.getElementById('cat-nombre');
+    const inputDescripcion = document.getElementById('cat-descripcion');
+    const inputColor = document.getElementById('cat-color');
+
+    function openModal() {
+        cerrarPicker();
+        errorBox.style.display = 'none';
+        inputNombre.value = '';
+        inputDescripcion.value = '';
+        inputColor.value = '#1a237e';
+        modal.style.display = 'flex';
+        setTimeout(() => inputNombre.focus(), 100);
+    }
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+
+    addBtn.addEventListener('click', openModal);
+    document.getElementById('btn-cancel-cat').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    document.getElementById('btn-save-cat').addEventListener('click', async function() {
+        errorBox.style.display = 'none';
+        const nombre = inputNombre.value.trim();
+        if (!nombre) {
+            errorBox.textContent = 'El nombre es obligatorio.';
+            errorBox.style.display = 'block';
+            return;
+        }
+        this.disabled = true;
+        this.textContent = 'Guardando…';
+
+        try {
+            const resp = await fetch('{% url "academia:api_categoria_crear" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: JSON.stringify({
+                    nombre: nombre,
+                    descripcion: inputDescripcion.value.trim(),
+                    color: inputColor.value,
+                }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                errorBox.textContent = data.error || 'No se pudo crear la categoría.';
+                errorBox.style.display = 'block';
+            } else {
+                // Refresca la lista completa y selecciona la nueva
+                await refrescarCategorias();
+                categoriaSelect.value = data.categoria.id;
+                actualizarSeleccion();
+                closeModal();
+            }
+        } catch (err) {
+            errorBox.textContent = 'Error de conexión: ' + err.message;
+            errorBox.style.display = 'block';
+        } finally {
+            this.disabled = false;
+            this.textContent = 'Guardar';
+        }
+    });
+
+    modal.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('btn-save-cat').click();
+        } else if (e.key === 'Escape') {
+            closeModal();
+        }
+    });
+
+    /* ════════════════════════════════════════════════════════════
+       MODAL "ELIMINAR CATEGORÍA"
+       ════════════════════════════════════════════════════════════ */
+    const modalEliminar = document.getElementById('modal-confirmar-eliminar');
+    const eliminarTexto = document.getElementById('confirm-eliminar-texto');
+    const eliminarNombre = document.getElementById('confirm-eliminar-nombre');
+    const eliminarError = document.getElementById('confirm-eliminar-error');
+    const btnConfirmEliminar = document.getElementById('btn-confirm-eliminar');
+    const btnCancelEliminar = document.getElementById('btn-cancel-eliminar');
+
+    let categoriaIdAEliminar = null;
+
+    function pedirConfirmacionEliminar(id, nombre) {
+        categoriaIdAEliminar = id;
+        eliminarNombre.textContent = nombre;
+        eliminarError.style.display = 'none';
+        btnConfirmEliminar.disabled = false;
+        btnConfirmEliminar.textContent = 'Sí, eliminar';
+        modalEliminar.style.display = 'flex';
+    }
+    function cerrarConfirmEliminar() {
+        modalEliminar.style.display = 'none';
+        categoriaIdAEliminar = null;
+    }
+
+    btnCancelEliminar.addEventListener('click', cerrarConfirmEliminar);
+    modalEliminar.addEventListener('click', (e) => {
+        if (e.target === modalEliminar) cerrarConfirmEliminar();
+    });
+
+    btnConfirmEliminar.addEventListener('click', async function() {
+        if (!categoriaIdAEliminar) return;
+        eliminarError.style.display = 'none';
+        this.disabled = true;
+        this.textContent = 'Eliminando…';
+
+        try {
+            const url = '/api/categoria/' + categoriaIdAEliminar + '/eliminar/';
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                eliminarError.textContent = data.error || 'No se pudo eliminar la categoría.';
+                eliminarError.style.display = 'block';
+                this.disabled = false;
+                this.textContent = 'Sí, eliminar';
+                return;
+            }
+            // Si era la seleccionada, limpiar la selección
+            if (parseInt(categoriaSelect.value, 10) === categoriaIdAEliminar) {
+                categoriaSelect.value = '';
+            }
+            await refrescarCategorias();
+            cerrarConfirmEliminar();
+            abrirPicker();  // re-abre el dropdown para feedback inmediato
+        } catch (err) {
+            eliminarError.textContent = 'Error de conexión: ' + err.message;
+            eliminarError.style.display = 'block';
+            this.disabled = false;
+            this.textContent = 'Sí, eliminar';
+        }
+    });
+
+    /* ── Helpers ── */
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+    function escapeAttr(s) {
+        return String(s).replace(/"/g, '&quot;');
+    }
+
+    /* ── Inicialización ── */
+    leerCategoriasDelSelect();
+    renderLista();
+    actualizarSeleccion();
+    refrescarCategorias();  // trae los colores reales en background
+})();
+</script>
+{% endblock %}

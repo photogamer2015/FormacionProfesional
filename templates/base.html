@@ -1,0 +1,631 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Formación Profesional EC{% endblock %}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #f5f5f7;
+            min-height: 100vh;
+            color: #222;
+        }
+        header.top {
+            background: #1a237e;
+            color: white;
+            padding: 14px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        header.top h1 {
+            font-size: 18px; /* Ligeramente más grande */
+            font-weight: 600; /* Un poco más de grosor para que se vea profesional */
+            letter-spacing: -0.3px; /* Espaciado más moderno */
+            margin: 0;
+            padding: 0;
+        }
+        header.top .logo-circle {
+            width: 42px;
+            height: 42px;
+    
+            border-radius: 50%;
+    
+            object-fit: cover;
+    
+          
+            background: #ffffff;
+            padding: 2px;
+            border: 2px solid #f97618; /* Borde dorado sutil que combina con los badges */
+    
+
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    
+          
+            margin: 0 !important; 
+    
+            
+            display: block;
+        }
+
+        header.top .brand {
+            display: flex;
+            align-items: center;
+            gap: 15px; /* Un poco más de espacio entre logo y texto */
+        }  }
+        .logo-mini {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: #FFD700; color: #1a237e;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 14px;
+        }
+        header.top nav { display: flex; gap: 8px; align-items: center; }
+        header.top a, header.top button {
+            color: white; text-decoration: none;
+            background: rgba(255,255,255,0.15);
+            padding: 8px 14px; border: none; border-radius: 6px;
+            font-size: 13px; font-family: inherit;
+            cursor: pointer; transition: background 0.2s;
+        }
+        header.top a:hover, header.top button:hover { background: rgba(255,255,255,0.28); }
+        header.top form { margin: 0; display: inline; }
+
+        header.top .user-info {
+            display: flex; 
+            flex-direction: column; 
+            align-items: flex-end; 
+            justify-content: center; 
+            gap: 5px; 
+            padding-right: 20px; 
+            margin-right: 20px; 
+            border-right: 2px solid rgba(255, 255, 255, 0.25); /* Línea divisoria elegante */
+            border-right: 2px solid rgba(255, 255, 255, 0.25); /* Línea divisoria elegante */
+
+        }
+        header.top .user-info h3 {
+            margin: 0;
+            padding: 0;
+            font-size: 15px; /* Tamaño ideal, ni muy grande ni muy chico */
+            font-weight: 600;
+            color: #ffffff;
+            line-height: 1; /* Evita espacios extra arriba y abajo del texto */
+            letter-spacing: 0.3px;
+        }
+        header.top .role-badge {
+            display: inline-block; 
+            padding: 3px 9px; 
+            border-radius: 12px; /* Más redondito */
+            font-size: 10px; 
+            font-weight: 800; /* Letra más gordita y legible */
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            line-height: 1;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15); /* Una sombra muy sutil */
+        }
+        .role-admin   { background: #ff7700; color: #ffffff; }
+        .role-asesor  { background: #377d2e; color: white; }
+        .role-default { background: rgba(255, 255, 255, 0.94); color: white; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+        .flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
+        .flash-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #2e7d32; }
+        .flash-error   { background: #ffebee; color: #c62828; border-left: 4px solid #c62828; }
+        .flash-warning { background: #fff8e1; color: #856404; border-left: 4px solid #f0ad4e; }
+        .flash-info    { background: #e3f2fd; color: #0d47a1; border-left: 4px solid #0d47a1; }
+
+        .btn {
+            display: inline-block; padding: 10px 18px; border-radius: 8px;
+            font-size: 14px; font-weight: 500; text-decoration: none;
+            cursor: pointer; border: none; font-family: inherit;
+            transition: all 0.15s;
+        }
+        .btn-primary    { background: #1a237e; color: white; }
+        .btn-primary:hover    { background: #283593; }
+        .btn-secondary  { background: #e0e0e0; color: #333; }
+        .btn-secondary:hover  { background: #cfcfcf; }
+        .btn-success    { background: #2e7d32; color: white; }
+        .btn-success:hover    { background: #1b5e20; }
+        .btn-danger     { background: #c62828; color: white; }
+        .btn-danger:hover     { background: #8e0000; }
+        .btn-warning    { background: #f0ad4e; color: white; }
+        .btn-sm { padding: 6px 10px; font-size: 12px; }
+
+        .card-box {
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 28px;
+        }
+
+        .form-input {
+            width: 100%; padding: 10px 12px;
+            border: 2px solid #e0e0e0; border-radius: 8px;
+            font-size: 14px; font-family: inherit;
+            background: white; transition: border 0.15s;
+        }
+        .form-input:focus { outline: none; border-color: #1a237e; }
+        .form-label {
+            display: block; font-size: 13px; font-weight: 600;
+            color: #444; margin-bottom: 6px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+        .form-section-title {
+            font-size: 16px; color: #1a237e;
+            font-weight: 600; margin: 24px 0 12px;
+            padding-bottom: 8px; border-bottom: 2px solid #FFD700;
+        }
+        .errorlist {
+            list-style: none; color: #c62828;
+            font-size: 12px; margin-top: 4px;
+        }
+
+      
+        .radio-group {
+            display: flex; flex-direction: column; gap: 8px;
+            background: #fafafa;
+            padding: 12px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .radio-group .radio-empty {
+            color: #888; font-size: 13px; font-style: italic;
+        }
+        .radio-group label {
+            display: flex; align-items: flex-start; gap: 8px;
+            font-size: 13px; cursor: pointer;
+            padding: 6px 8px; border-radius: 6px;
+            transition: background 0.1s;
+        }
+        .radio-group label:hover { background: #fff; }
+        .radio-group input[type="radio"] {
+            margin-top: 2px; accent-color: #1a237e;
+            cursor: pointer;
+        }
+
+        .table-wrap {
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            overflow-x: auto;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead tr { background: #1a237e; color: white; }
+        th, td {
+            padding: 12px 14px; text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap;
+        }
+        tbody tr:hover { background: #fafafa; }
+
+        .badge {
+            display: inline-block; padding: 3px 10px;
+            border-radius: 12px; font-size: 11px; font-weight: 600;
+        }
+        .badge-pagado    { background: #e8f5e9; color: #2e7d32; }
+        .badge-pendiente { background: #ffebee; color: #c62828; }
+        .badge-parcial   { background: #fff8e1; color: #856404; }
+        .badge-presencial{ background: #e3f2fd; color: #0d47a1; }
+        .badge-online    { background: #e8f5e9; color: #2e7d32; }
+
+        .crumb { font-size: 13px; color: #666; margin-bottom: 16px; }
+        .crumb a { color: #1a237e; text-decoration: none; }
+        .crumb a:hover { text-decoration: underline; }
+
+        .row-actions { display: flex; gap: 6px; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #888; }
+
+        h2.page-title { font-size: 24px; color: #1a237e; margin-bottom: 6px; }
+        .page-subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+        .toolbar {
+            display: flex; gap: 12px; flex-wrap: wrap;
+            margin-bottom: 18px; align-items: center;
+        }
+        .toolbar form { display: flex; gap: 8px; flex: 1; min-width: 240px; }
+        .logo-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #ffffff;
+            color:  #d7642f;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0 auto 16px;
+        }
+
+        .modalidad-tabs {
+            display: flex; gap: 4px;
+            background: #e8eaf6;
+            padding: 4px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            width: fit-content;
+        }
+        .modalidad-tabs a {
+            padding: 8px 22px; border-radius: 8px;
+            text-decoration: none; font-size: 14px; font-weight: 600;
+            color: #5c6bc0; transition: all 0.15s;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .modalidad-tabs a:hover { color: #1a237e; }
+        .modalidad-tabs a.active {
+            background: white; color: #1a237e;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+        .modalidad-tabs .tab-count {
+            background: rgba(26,35,126,0.1); color: #1a237e;
+            padding: 1px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 700;
+        }
+        .modalidad-tabs a.active .tab-count {
+            background: #FFD700; color: #1a237e;
+        }
+
+        /* Indicador visual de modo solo lectura para asesores */
+        .readonly-banner {
+            background: #fff8e1;
+            border-left: 4px solid #f0ad4e;
+            padding: 10px 14px; border-radius: 6px;
+            margin-bottom: 16px; font-size: 13px;
+            color: #856404;
+        }
+
+        /* ── MODO OSCURO ── */
+        body.dark-mode { background: #121212; color: #e0e0e0; }
+        body.dark-mode header.top { background: #000000; border-bottom: 1px solid #333; }
+        body.dark-mode .card-box, body.dark-mode .table-wrap, body.dark-mode .toolbar { 
+            background: #1e1e1e; border: 1px solid #333; color: #e0e0e0; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        body.dark-mode h1, body.dark-mode h2, body.dark-mode h3, body.dark-mode h4, body.dark-mode h5, body.dark-mode .page-title, body.dark-mode .card-title, body.dark-mode .form-section-title { 
+            color: #90caf9 !important; border-color: #555;
+        }
+        
+        /* ── Forzar todos los azules oscuros inline a celeste ── */
+        body.dark-mode [style*="color:#1a237e"],
+        body.dark-mode [style*="color: #1a237e"],
+        body.dark-mode [style*="color:#1A237E"],
+        body.dark-mode [style*="color: #1A237E"] {
+            color: #90caf9 !important;
+        }
+        body.dark-mode [style*="border-top:4px solid #1a237e"],
+        body.dark-mode [style*="border-top: 4px solid #1a237e"],
+        body.dark-mode [style*="border-left: 4px solid #1a237e"],
+        body.dark-mode [style*="border-left:4px solid #1a237e"],
+        body.dark-mode [style*="border-color: #1a237e"],
+        body.dark-mode [style*="border-color:#1a237e"] {
+            border-color: #90caf9 !important;
+        }
+        /* Cajas de info con fondo azul claro (ej: vendedora) */
+        body.dark-mode [style*="background:#E3F2FD"],
+        body.dark-mode [style*="background: #E3F2FD"] {
+            background: #1a2a3a !important;
+        }
+        /* Flash info en dark mode */
+        body.dark-mode .flash-info {
+            background: #1a2a3a;
+            color: #90caf9;
+            border-left-color: #90caf9;
+        }
+        body.dark-mode .form-label, body.dark-mode .crumb, body.dark-mode .page-subtitle, body.dark-mode .card-desc { 
+            color: #aaa; 
+        }
+        body.dark-mode .crumb a { color: #90caf9; }
+        body.dark-mode .form-input, body.dark-mode select.form-input { 
+            background: #2c2c2c; color: #fff; border-color: #444; 
+        }
+        body.dark-mode .form-input:focus { border-color: #90caf9; }
+        body.dark-mode th { background: #111; color: #ccc; border-bottom: 1px solid #333; }
+        body.dark-mode td { border-bottom: 1px solid #333; color: #ddd; }
+        body.dark-mode tbody tr:hover { background: #2a2a2a; }
+        body.dark-mode .radio-group { background: #222; border-color: #444; }
+        body.dark-mode .radio-group label:hover { background: #333; }
+        body.dark-mode .modalidad-tabs { background: #222; }
+        body.dark-mode .modalidad-tabs a { color: #aaa; }
+        body.dark-mode .modalidad-tabs a.active { background: #333; color: #fff; }
+        body.dark-mode .btn-secondary { background: #444; color: #fff; }
+        body.dark-mode .btn-secondary:hover { background: #555; }
+        body.dark-mode .alert-box, body.dark-mode .readonly-banner { background: #3e2723; color: #ffb300; border-color: #ffb300; }
+        body.dark-mode .empty-state { color: #888; }
+        body.dark-mode .logo-circle { background: #ffffff !important; }
+
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <header class="top">
+        <div class="brand">
+            <div class="logo-area">
+                <img src="{% static 'logo.png' %}" alt="Logo Formación Profesional EC" class="logo-circle">
+            </div>
+            <h1>Formación Profesional EC</h1>
+        </div>
+        <nav>
+            {% if user.is_authenticated %}
+                <div class="user-info">
+                    <h3>{{ user.first_name|default:user.username }}</h3>
+                    {% if es_admin %}
+                        <span class="role-badge role-admin">Administrador</span>
+                    {% elif es_asesor %}
+                        <span class="role-badge role-asesor">Asesor</span>
+                    {% else %}
+                        <span class="role-badge role-default">Sin rol</span>
+                    {% endif %}
+                </div>
+                <button id="theme-toggle" title="Alternar modo oscuro" style="background: rgba(255,255,255,0.15); border-radius: 50%; width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 18px;">🌙</button>
+                <a href="{% url 'academia:bienvenida' %}">Inicio</a>
+                {% if es_admin %}
+                    <a href="/admin/" title="Panel administrativo de Django">Dashboard Admin</a>
+                {% endif %}
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Cerrar sesión</button>
+                </form>
+            {% endif %}
+        </nav>
+    </header>
+
+    <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="flash flash-{{ message.tags|default:'info' }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        {% if es_asesor and not es_admin %}
+            {% block readonly_banner %}{% endblock %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block extra_js %}{% endblock %}
+
+    <!-- ══ MODAL DE CONFIRMACIÓN GLOBAL ════════════════════════════════ -->
+    <div id="confirm-modal-overlay" style="
+        display: none; position: fixed; inset: 0; z-index: 9999;
+        background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
+        align-items: center; justify-content: center;
+        animation: fadeInOverlay 0.2s ease;
+    ">
+        <div id="confirm-modal-box" style="
+            background: white; border-radius: 16px;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+            padding: 36px 32px 28px; max-width: 420px; width: 90%;
+            text-align: center;
+            animation: slideUpModal 0.25s cubic-bezier(0.34,1.56,0.64,1);
+            position: relative;
+        ">
+            <!-- Icono dinámico -->
+            <div id="confirm-modal-icon" style="
+                width: 64px; height: 64px; border-radius: 50%;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 28px; margin: 0 auto 16px; 
+            "></div>
+
+            <h3 id="confirm-modal-title" style="
+                font-size: 18px; font-weight: 700; color: #1a237e;
+                margin: 0 0 10px;
+            "></h3>
+
+            <p id="confirm-modal-message" style="
+                font-size: 14px; color: #666; line-height: 1.5;
+                margin: 0 0 28px;
+            "></p>
+
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button id="confirm-modal-cancel" onclick="cerrarModal()" style="
+                    flex: 1; max-width: 160px;
+                    padding: 11px 20px; border-radius: 10px;
+                    border: 2px solid #e0e0e0; background: white;
+                    font-size: 14px; font-weight: 600; color: #555;
+                    cursor: pointer; transition: all 0.15s; font-family: inherit;
+                ">Cancelar</button>
+                <button id="confirm-modal-confirm" style="
+                    flex: 1; max-width: 160px;
+                    padding: 11px 20px; border-radius: 10px;
+                    border: none; background: #c62828; color: white;
+                    font-size: 14px; font-weight: 600;
+                    cursor: pointer; transition: all 0.15s; font-family: inherit;
+                    box-shadow: 0 4px 12px rgba(198,40,40,0.3);
+                ">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes fadeInOverlay {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        @keyframes slideUpModal {
+            from { opacity: 0; transform: translateY(30px) scale(0.95); }
+            to   { opacity: 1; transform: translateY(0)    scale(1); }
+        }
+        #confirm-modal-cancel:hover {
+            background: #f5f5f5; border-color: #bbb;
+        }
+        #confirm-modal-confirm:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+        /* Dark mode */
+        body.dark-mode #confirm-modal-box {
+            background: #1e1e1e; border: 1px solid #333;
+        }
+        body.dark-mode #confirm-modal-title { color: #90caf9; }
+        body.dark-mode #confirm-modal-message { color: #aaa; }
+        body.dark-mode #confirm-modal-cancel {
+            background: #2c2c2c; border-color: #555; color: #ddd;
+        }
+        body.dark-mode #confirm-modal-cancel:hover {
+            background: #383838;
+        }
+    </style>
+
+    <script>
+        // ── Sistema de Modal de Confirmación ─────────────────────────────
+        let _modalFormTarget = null;
+
+        const MODAL_TIPOS = {
+            danger: {
+                icon: '🗑️',
+                bgIcon: '#ffebee',
+                colorBtn: '#c62828',
+                shadowBtn: 'rgba(198,40,40,0.3)',
+            },
+            warning: {
+                icon: '⚠️',
+                bgIcon: '#fff8e1',
+                colorBtn: '#e65100',
+                shadowBtn: 'rgba(230,81,0,0.3)',
+            },
+            info: {
+                icon: 'ℹ️',
+                bgIcon: '#e3f2fd',
+                colorBtn: '#1a237e',
+                shadowBtn: 'rgba(26,35,126,0.3)',
+            },
+        };
+
+        function confirmarAccion(form, mensaje, tipo) {
+            tipo = tipo || 'danger';
+            const cfg = MODAL_TIPOS[tipo] || MODAL_TIPOS.danger;
+            _modalFormTarget = form;
+
+            const overlay = document.getElementById('confirm-modal-overlay');
+            const iconEl   = document.getElementById('confirm-modal-icon');
+            const titleEl  = document.getElementById('confirm-modal-title');
+            const msgEl    = document.getElementById('confirm-modal-message');
+            const btnConf  = document.getElementById('confirm-modal-confirm');
+
+            iconEl.textContent         = cfg.icon;
+            iconEl.style.background    = cfg.bgIcon;
+            titleEl.textContent        = '¿Estás seguro?';
+            msgEl.textContent          = mensaje;
+            btnConf.style.background   = cfg.colorBtn;
+            btnConf.style.boxShadow    = `0 4px 12px ${cfg.shadowBtn}`;
+
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function cerrarModal() {
+            const overlay = document.getElementById('confirm-modal-overlay');
+            overlay.style.display = 'none';
+            document.body.style.overflow = '';
+            _modalFormTarget = null;
+        }
+
+        document.getElementById('confirm-modal-confirm').addEventListener('click', function() {
+            if (_modalFormTarget) {
+                _modalFormTarget.submit();
+            }
+            cerrarModal();
+        });
+
+        // Cerrar al hacer clic en el fondo
+        document.getElementById('confirm-modal-overlay').addEventListener('click', function(e) {
+            if (e.target === this) cerrarModal();
+        });
+
+        // Cerrar con Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') cerrarModal();
+        });
+
+        // ── Modo Oscuro ──────────────────────────────────────────────────
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const body = document.body;
+        
+        if (localStorage.getItem('theme') === 'dark') {
+            body.classList.add('dark-mode');
+            if (themeToggleBtn) themeToggleBtn.textContent = '☀️';
+        }
+
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', () => {
+                body.classList.toggle('dark-mode');
+                if (body.classList.contains('dark-mode')) {
+                    localStorage.setItem('theme', 'dark');
+                    themeToggleBtn.textContent = '☀️';
+                } else {
+                    localStorage.setItem('theme', 'light');
+                    themeToggleBtn.textContent = '🌙';
+                }
+            });
+        }
+    </script>
+
+    <!-- Simple Assistant Widget (keyword-based) -->
+    <div id="assistant-widget" style="position:fixed; right:18px; bottom:18px; z-index:1200;">
+        <button id="assistant-toggle" class="btn btn-primary" style="border-radius:999px; padding:10px 14px;">💬 Ayuda</button>
+        <div id="assistant-panel" style="display:none; width:360px; max-width:90vw; box-shadow:0 8px 24px rgba(0,0,0,0.18); background:white; border-radius:12px; overflow:hidden; margin-top:10px;">
+            <div style="padding:10px 12px; background:#1a237e; color:white; font-weight:700; display:flex; justify-content:space-between; align-items:center;">
+                <div>Asistente rápido</div>
+                <button id="assistant-close" style="background:transparent; border:none; color:white; font-size:16px; cursor:pointer;">✕</button>
+            </div>
+            <div id="assistant-messages" style="height:260px; overflow:auto; padding:12px; background:#fafafa;"></div>
+            <div style="display:flex; gap:8px; padding:10px; background:#fff;">
+                <input id="assistant-input" class="form-input" placeholder="Escribe tu pregunta..." style="flex:1;" />
+                <button id="assistant-send" class="btn btn-primary btn-sm">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function(){
+            function getCookie(name) {
+                const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+                return v ? v.pop() : '';
+            }
+            const toggle = document.getElementById('assistant-toggle');
+            const panel = document.getElementById('assistant-panel');
+            const closeBtn = document.getElementById('assistant-close');
+            const sendBtn = document.getElementById('assistant-send');
+            const input = document.getElementById('assistant-input');
+            const msgs = document.getElementById('assistant-messages');
+
+            function appendMessage(who, text) {
+                const el = document.createElement('div');
+                el.style.marginBottom = '8px';
+                el.innerHTML = `<div style="font-size:12px;color:#666;">${who}</div><div style="padding:8px 10px; border-radius:8px; background:${who==='Tú'?'#e8f0ff':'#fff'}; margin-top:6px;">${text}</div>`;
+                msgs.appendChild(el);
+                msgs.scrollTop = msgs.scrollHeight;
+            }
+
+            toggle.addEventListener('click', ()=> { panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; input.focus(); });
+            closeBtn.addEventListener('click', ()=> panel.style.display='none');
+
+            async function sendQuery() {
+                const q = input.value.trim();
+                if (!q) return;
+                appendMessage('Tú', q);
+                input.value = '';
+                try {
+                    const res = await fetch('{% url "academia:assistant_simple_chat" %}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                        body: JSON.stringify({ message: q, path: window.location.pathname })
+                    });
+                    const data = await res.json();
+                    appendMessage('Bot', data.reply || 'No hay respuesta');
+                } catch (err) {
+                    appendMessage('Bot', 'Error de conexión. Intenta nuevamente.');
+                }
+            }
+
+            sendBtn.addEventListener('click', sendQuery);
+            input.addEventListener('keydown', function(e){ if (e.key === 'Enter') sendQuery(); });
+        })();
+    </script>
+</body>
+</html>

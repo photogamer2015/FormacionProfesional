@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+
+{% block title %}Hoja de Recaudación{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Estilos solo de pantalla (no se imprimen) */
+    .no-print { /* se oculta al imprimir */ }
+
+    @media print {
+        body { background: white !important; }
+        .no-print, .crumb, .top-bar, header, nav, .menu, .sidebar { display: none !important; }
+        .hoja-recaudacion { page-break-after: always; box-shadow: none !important; border: none !important; padding: 14px !important; }
+        .hoja-recaudacion:last-of-type { page-break-after: auto; }
+        .hoja-tabla th { background:#f0ad4e !important; color:white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .hoja-totales { background:#fff8e1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    .hoja-recaudacion {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    .hoja-encabezado {
+        background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 14px;
+        font-size: 13px;
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    .hoja-meta {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-bottom: 12px;
+        font-size: 12px;
+    }
+    .hoja-meta div {
+        background: #f5f7fb;
+        padding: 6px 10px;
+        border-radius: 4px;
+    }
+    .hoja-meta strong { color: #1a237e; }
+
+    .hoja-tabla {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+    .hoja-tabla th, .hoja-tabla td {
+        border: 1px solid #ddd;
+        padding: 6px 8px;
+        text-align: left;
+        vertical-align: middle;
+    }
+    .hoja-tabla th {
+        background: #f0ad4e;
+        color: white;
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+    }
+    .hoja-tabla tr:nth-child(even) td { background: #fafafa; }
+    .hoja-totales {
+        background: #fff8e1;
+        padding: 12px 16px;
+        margin-top: 12px;
+        border-radius: 6px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        font-size: 13px;
+    }
+    .hoja-totales div {
+        text-align: center;
+    }
+    .hoja-totales .label {
+        font-size: 10px;
+        color: #888;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+    .hoja-totales .valor {
+        font-size: 18px;
+        color: #1a237e;
+        font-weight: 700;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crumb no-print">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:pagos_lista' %}">Pagos</a> &nbsp;›&nbsp;
+    Hoja de Recaudación
+</div>
+
+<div class="no-print" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+    <div>
+        <h2 class="page-title">🖨️ Hoja de Recaudación</h2>
+        <p class="page-subtitle">
+            Genera una hoja por curso para una fecha y ciudad determinadas. Replica el formato físico
+            de las recaudaciones diarias.
+        </p>
+    </div>
+    {% if hojas %}
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        {% with qs="?fecha="|add:filtros.fecha|add:"&ciudad="|add:filtros.ciudad|add:"&curso="|add:filtros.curso|add:"&modalidad="|add:filtros.modalidad %}
+        <a href="{% url 'academia:hoja_recaudacion_export_excel' %}{{ qs }}"
+           class="btn btn-secondary" title="Exportar a Excel">📊 Excel</a>
+        <a href="{% url 'academia:hoja_recaudacion_export_pdf' %}{{ qs }}"
+           class="btn btn-secondary" title="Exportar a PDF">📄 PDF</a>
+        <button type="button" onclick="window.print()" class="btn btn-success">🖨️ Imprimir</button>
+        {% endwith %}
+    </div>
+    {% endif %}
+</div>
+
+{# ─── Filtros ───────────────────────────────── #}
+<div class="card-box no-print" style="margin-bottom:18px; padding:16px;">
+    <form method="get" style="display:grid; grid-template-columns: 1fr 1fr 1fr 2fr auto; gap:10px; align-items:end;">
+        <div>
+            <label class="form-label" style="font-size:11px;">Fecha *</label>
+            <input type="date" name="fecha" value="{{ filtros.fecha }}" class="form-input" required>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Modalidad</label>
+            <select name="modalidad" class="form-input">
+                <option value="">— Todas —</option>
+                <option value="presencial" {% if filtros.modalidad == 'presencial' %}selected{% endif %}>🏫 Presencial</option>
+                <option value="online" {% if filtros.modalidad == 'online' %}selected{% endif %}>🟢 Online</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Ciudad</label>
+            <select name="ciudad" class="form-input">
+                <option value="">— Todas —</option>
+                <option value="Guayaquil" {% if filtros.ciudad == 'Guayaquil' %}selected{% endif %}>Guayaquil</option>
+                <option value="Quito" {% if filtros.ciudad == 'Quito' %}selected{% endif %}>Quito</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Curso (opcional)</label>
+            <select name="curso" class="form-input">
+                <option value="">— Todos los cursos del día —</option>
+                {% for c in cursos_disponibles %}
+                <option value="{{ c.pk }}" {% if filtros.curso == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Generar</button>
+    </form>
+</div>
+
+{# ─── Hojas por curso ─────────────────────── #}
+{% if not filtros.fecha %}
+<div class="card-box" style="padding:30px; text-align:center; background:#f5f7ff;">
+    <p style="font-size:15px; color:#666;">📅 Selecciona una fecha para generar las hojas de recaudación.</p>
+</div>
+{% elif not hojas %}
+<div class="card-box" style="padding:30px; text-align:center;">
+    <p style="font-size:15px; color:#666;">
+        No se encontraron matrículas con los filtros aplicados.
+    </p>
+</div>
+{% else %}
+
+{% for hoja in hojas %}
+<div class="hoja-recaudacion">
+    <div class="hoja-encabezado">
+        Módulo de {{ hoja.curso.nombre }} — Recordar que si el estudiante falta a clases igual debe cumplir con el plan de financiamiento
+    </div>
+
+    <div class="hoja-meta">
+        <div><strong>FECHA:</strong> {{ hoja.dia_semana }} {{ hoja.fecha|date:"d \d\e F \d\e Y" }}</div>
+        <div><strong>CIUDAD:</strong> {{ hoja.ciudad }}</div>
+        <div><strong>RESPONSABLE:</strong> {{ hoja.responsable }}</div>
+        <div><strong>ESTUDIANTES:</strong> {{ hoja.items|length }}</div>
+    </div>
+
+    <table class="hoja-tabla">
+        <thead>
+            <tr>
+                <th style="width:30px; text-align:center;">#</th>
+                <th>Nombre del estudiante</th>
+                <th style="width:90px; text-align:center;">Inicio jornada</th>
+                <th style="width:50px; text-align:center;">Mód.</th>
+                <th style="width:80px; text-align:right;">Recaudar</th>
+                <th style="width:80px; text-align:right;">Recaudado</th>
+                <th style="width:120px;">Forma de pago</th>
+                <th style="width:110px;">Banco</th>
+                <th style="width:80px; text-align:center;">Asistencia</th>
+                <th style="width:110px;">Recuperación</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in hoja.items %}
+            <tr>
+                <td style="text-align:center; color:#888;">{{ forloop.counter }}</td>
+                <td>
+                    {{ item.estudiante.nombre_completo }}
+                    {% if item.talla %}<span style="color:#888; font-size:10px;">({{ item.talla }})</span>{% endif %}
+                </td>
+                <td style="text-align:center; font-size:11px;">
+                    {% if item.jornada_inicio %}{{ item.jornada_inicio|date:"d/m/Y" }}{% else %}—{% endif %}
+                </td>
+                <td style="text-align:center; font-weight:700;">{{ item.modulo }}</td>
+                <td style="text-align:right;">${{ item.recaudar|floatformat:2 }}</td>
+                <td style="text-align:right; font-weight:700; color:{% if item.recaudado > 0 %}#2e7d32{% else %}#999{% endif %};">
+                    ${{ item.recaudado|floatformat:2 }}
+                </td>
+                <td>{{ item.forma_pago }}</td>
+                <td>{{ item.banco }}</td>
+                <td style="text-align:center;">{{ item.asistencia }}</td>
+                <td style="color:#c9a227; font-weight:600;">{{ item.recuperacion }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="hoja-totales">
+        <div>
+            <div class="label">A Recaudar</div>
+            <div class="valor" style="color:#c62828;">${{ hoja.total_recaudar_esperado|floatformat:2 }}</div>
+        </div>
+        <div>
+            <div class="label">Efectivo</div>
+            <div class="valor" style="color:#2e7d32;">${{ hoja.total_efectivo|floatformat:2 }}</div>
+        </div>
+        <div>
+            <div class="label">Transferencia</div>
+            <div class="valor" style="color:#0d47a1;">${{ hoja.total_transferencia|floatformat:2 }}</div>
+        </div>
+        <div>
+            <div class="label">Total recaudado</div>
+            <div class="valor">${{ hoja.total_recaudado|floatformat:2 }}</div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% endif %}
+{% endblock %}

@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}Adicional — Formación Profesional EC{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp; Adicional
+</div>
+
+<h2 class="page-title">➕ Adicional</h2>
+<p class="page-subtitle">
+    Registro de servicios extra: certificados, examen supletorio y camisas adicionales.
+    Aplica para estudiantes internos y para personas externas.
+</p>
+
+{# ─── KPIs ─── #}
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:24px;">
+    <div class="card-box" style="border-top:4px solid #2e7d32; padding:16px;">
+        <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">TOTAL ADICIONALES</div>
+        <div style="font-size:22px; font-weight:700; color:#2e7d32; margin-top:4px;">${{ total_valor|floatformat:2 }}</div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">{{ total_adicionales }} registro{{ total_adicionales|pluralize }}</div>
+    </div>
+
+    <div class="card-box" style="border-top:4px solid #1a237e; padding:16px;">
+        <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">PERSONAS EXTERNAS</div>
+        <div style="font-size:22px; font-weight:700; color:#1a237e; margin-top:4px;">{{ total_externas }}</div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">Registradas en el sistema</div>
+    </div>
+
+    {% for d in desglose_tipos|slice:":3" %}
+    <div class="card-box" style="border-top:4px solid #f0ad4e; padding:16px;">
+        <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">{{ d.label|upper }}</div>
+        <div style="font-size:22px; font-weight:700; color:#f0ad4e; margin-top:4px;">${{ d.total|floatformat:2 }}</div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">{{ d.count }} registro{{ d.count|pluralize }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<hr style="margin: 16px 0 28px; border: none; border-top: 1px solid #e0e0e0;">
+
+{# ── Mini menú ── #}
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px;">
+
+    <a href="{% url 'academia:adicional_crear_interno' %}" style="text-decoration:none;">
+        <div class="card-box" style="border-left: 4px solid #2e7d32; cursor:pointer; transition: transform 0.15s;"
+             onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="font-size:32px; margin-bottom:8px;">＋</div>
+            <h3 style="color:#1a237e; font-size:17px; margin-bottom:6px;">Agregar Adicional</h3>
+            <p style="color:#666; font-size:13px;">
+                Para un estudiante <strong>interno</strong> de la academia.
+                Certificado, examen supletorio o camisa.
+            </p>
+        </div>
+    </a>
+
+    <a href="{% url 'academia:adicional_crear_externo' %}" style="text-decoration:none;">
+        <div class="card-box" style="border-left: 4px solid #1a237e; cursor:pointer; transition: transform 0.15s;"
+             onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="font-size:32px; margin-bottom:8px;">👤＋</div>
+            <h3 style="color:#1a237e; font-size:17px; margin-bottom:6px;">Agregar Persona Externa</h3>
+            <p style="color:#666; font-size:13px;">
+                Vender un adicional a alguien <strong>fuera</strong> de la institución
+                (registrarla primero si no existe).
+            </p>
+        </div>
+    </a>
+
+    <a href="{% url 'academia:adicional_lista' %}" style="text-decoration:none;">
+        <div class="card-box" style="border-left: 4px solid #FFD700; cursor:pointer; transition: transform 0.15s;"
+             onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="font-size:32px; margin-bottom:8px;">≡</div>
+            <h3 style="color:#1a237e; font-size:17px; margin-bottom:6px;">Lista de Adicionales</h3>
+            <p style="color:#666; font-size:13px;">
+                Ver todos los adicionales (internos y externos),
+                filtrar por tipo, fecha y persona.
+            </p>
+        </div>
+    </a>
+
+    <a href="{% url 'academia:personas_externas_lista' %}" style="text-decoration:none;">
+        <div class="card-box" style="border-left: 4px solid #6a1b9a; cursor:pointer; transition: transform 0.15s;"
+             onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="font-size:32px; margin-bottom:8px;">📇</div>
+            <h3 style="color:#1a237e; font-size:17px; margin-bottom:6px;">Lista Personas Externas</h3>
+            <p style="color:#666; font-size:13px;">
+                Directorio de personas externas a la academia que han comprado
+                algún adicional.
+            </p>
+        </div>
+    </a>
+</div>
+
+{% if desglose_tipos %}
+<div class="card-box" style="margin-top:28px; padding:20px;">
+    <h3 style="color:#1a237e; font-size:15px; margin-bottom:14px;">📊 Desglose por tipo</h3>
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px;">
+        {% for d in desglose_tipos %}
+        <div style="padding:12px; background:#fafafa; border-radius:8px; border-left:3px solid #f0ad4e;">
+            <div style="font-size:13px; font-weight:600; color:#1a237e;">{{ d.label }}</div>
+            <div style="font-size:11px; color:#666;">{{ d.count }} registro{{ d.count|pluralize }}</div>
+            <div style="font-size:18px; font-weight:700; color:#2e7d32; margin-top:4px;">${{ d.total|floatformat:2 }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

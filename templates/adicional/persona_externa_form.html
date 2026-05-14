@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:adicional_menu' %}">Adicional</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:personas_externas_lista' %}">Personas Externas</a> &nbsp;›&nbsp;
+    {% if modo == 'editar' %}Editar{% else %}Registrar{% endif %}
+</div>
+
+<h2 class="page-title">{{ titulo }}</h2>
+<p class="page-subtitle">
+    Datos de una persona <strong>fuera</strong> de la academia. Solo cédula, apellidos y nombres son obligatorios.
+</p>
+
+<form method="post" class="card-box" novalidate>
+    {% csrf_token %}
+
+    <h3 class="form-section-title">Datos personales</h3>
+    <div class="form-grid">
+        <div>
+            <label class="form-label" for="{{ form.cedula.id_for_label }}">{{ form.cedula.label }}</label>
+            {{ form.cedula }}
+            {{ form.cedula.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ form.apellidos.id_for_label }}">{{ form.apellidos.label }}</label>
+            {{ form.apellidos }}
+            {{ form.apellidos.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ form.nombres.id_for_label }}">{{ form.nombres.label }}</label>
+            {{ form.nombres }}
+            {{ form.nombres.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ form.correo.id_for_label }}">{{ form.correo.label }}</label>
+            {{ form.correo }}
+            {{ form.correo.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ form.celular.id_for_label }}">{{ form.celular.label }}</label>
+            {{ form.celular }}
+            {{ form.celular.errors }}
+        </div>
+        <div>
+            <label class="form-label" for="{{ form.ciudad.id_for_label }}">{{ form.ciudad.label }}</label>
+            {{ form.ciudad }}
+            {{ form.ciudad.errors }}
+        </div>
+    </div>
+
+    <div style="margin-top:14px;">
+        <label class="form-label" for="{{ form.observaciones.id_for_label }}">Observaciones</label>
+        {{ form.observaciones }}
+    </div>
+
+    {# Si vino desde "+ Adicional Externo", marcar checkbox para regresar allá tras registrar #}
+    {% if modo == 'crear' %}
+    <input type="hidden" name="redir_to_adicional" value="1">
+    {% endif %}
+
+    <div style="display:flex; gap:10px; margin-top:24px; justify-content:flex-end;">
+        <a href="{% url 'academia:personas_externas_lista' %}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary">
+            {% if modo == 'editar' %}💾 Guardar cambios{% else %}＋ Registrar y continuar a Adicional{% endif %}
+        </button>
+    </div>
+</form>
+
+{% endblock %}

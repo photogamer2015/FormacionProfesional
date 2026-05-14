@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:admin_dashboard' %}">Registro Administrativo</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:admin_egresos_lista' %}">Egresos</a> &nbsp;›&nbsp;
+    {% if modo == 'editar' %}Editar #{{ egreso.pk }}{% else %}Nuevo{% endif %}
+</div>
+
+<h2 class="page-title">{% if modo == 'editar' %}✎ {% else %}+ {% endif %}{{ titulo }}</h2>
+<p class="page-subtitle">
+    {% if modo == 'editar' %}
+        Modifica los datos del egreso y guarda los cambios.
+    {% else %}
+        Registra un nuevo gasto: sueldo, alquiler, comisión a asesora, materiales, etc.
+    {% endif %}
+</p>
+
+<form method="post" class="card-box" novalidate style="max-width:680px;">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="flash flash-error" style="margin-bottom:14px;">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div>
+            <label class="form-label">Fecha *</label>
+            {{ form.fecha }}
+            {{ form.fecha.errors }}
+        </div>
+        <div>
+            <label class="form-label">Categoría *</label>
+            {{ form.categoria }}
+            {{ form.categoria.errors }}
+        </div>
+    </div>
+
+    <div style="margin-bottom:14px;">
+        <label class="form-label">Concepto *</label>
+        {{ form.concepto }}
+        {{ form.concepto.errors }}
+        <small style="color:#888; font-size:11px;">Descripción corta. Ej.: "Sueldo Mayo - Ana", "Alquiler oficina junio".</small>
+    </div>
+
+    <div style="margin-bottom:14px;">
+        <label class="form-label">Monto (USD) *</label>
+        {{ form.monto }}
+        {{ form.monto.errors }}
+    </div>
+
+    <div style="margin-bottom:18px;">
+        <label class="form-label">Notas <span style="color:#888; font-weight:400; font-size:11px;">(opcional)</span></label>
+        {{ form.notas }}
+        {{ form.notas.errors }}
+        <small style="color:#888; font-size:11px;">Detalles: nº factura, beneficiario, referencia bancaria, etc.</small>
+    </div>
+
+    {% if modo == 'editar' %}
+        <div style="background:#fafafa; padding:10px; border-radius:6px; font-size:12px; color:#666; margin-bottom:14px;">
+            Registrado el {{ egreso.creado|date:"d/m/Y H:i" }}
+            {% if egreso.registrado_por %}
+                por <strong>{{ egreso.registrado_por.get_full_name|default:egreso.registrado_por.username }}</strong>
+            {% endif %}.
+        </div>
+    {% endif %}
+
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <a href="{% url 'academia:admin_egresos_lista' %}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary">
+            {% if modo == 'editar' %}Guardar cambios{% else %}Registrar egreso{% endif %}
+        </button>
+    </div>
+</form>
+{% endblock %}

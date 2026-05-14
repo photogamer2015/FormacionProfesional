@@ -1,0 +1,491 @@
+{% extends 'base.html' %}
+
+{% block title %}Pagos — Estado financiero{% endblock %}
+
+{% block extra_head %}
+<style>
+    .payment-summary {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 150px;
+        white-space: normal;
+    }
+    .payment-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        width: fit-content;
+        max-width: 100%;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #f5f7ff;
+        color: #1a237e;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid #dfe3ff;
+    }
+    .payment-chip strong {
+        color: #2e7d32;
+        font-size: 11px;
+    }
+    .payment-empty {
+        color: #888;
+        font-size: 12px;
+    }
+    body.dark-mode .payment-chip {
+        background: #1f2a44;
+        border-color: #34446a;
+        color: #d8e2ff;
+    }
+    /* Celda de jornada/día — compacta */
+    .jornada-cell {
+        white-space: normal;
+        min-width: 130px;
+        font-size: 12px;
+        line-height: 1.35;
+    }
+    .jornada-cell strong { color:#1a237e; }
+    .jornada-cell small { color:#666; font-size:10px; }
+    /* Firma / asistencia: línea para escribir */
+    .asistencia-line {
+        display: block;
+        min-height: 28px;
+        min-width: 110px;
+        border-bottom: 1px solid #999;
+    }
+    @media print {
+        /* ─── Página: A3 horizontal con márgenes pequeños para que entre toda la info ─── */
+        @page {
+            size: A3 landscape;
+            margin: 8mm 6mm 10mm 6mm;
+        }
+        html, body {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            color: #000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        /* Ocultar todo lo que no es la tabla */
+        header.top, nav, .crumb, .no-print,
+        .card-box, form,
+        .page-subtitle { display: none !important; }
+        .container { padding: 0 !important; max-width: 100% !important; }
+
+        /* Encabezado de impresión visible solo en print */
+        .print-header { display: block !important; }
+        h2.page-title {
+            font-size: 16px !important;
+            color: #1a237e !important;
+            margin: 0 0 4px 0 !important;
+            text-align: center;
+        }
+
+        /* Layout del bloque de título: centrado y compacto */
+        .toolbar-row { display: block !important; text-align: center !important; margin-bottom: 8px !important; }
+
+        /* Tabla a ancho completo, sin sombras ni bordes redondeados */
+        .table-wrap {
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            overflow: visible !important;
+            background: transparent !important;
+        }
+        table {
+            font-size: 9px !important;
+            width: 100% !important;
+            table-layout: fixed !important;  /* Distribuye las columnas equitativamente */
+            border-collapse: collapse !important;
+        }
+        th, td {
+            padding: 4px 4px !important;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: anywhere !important;
+            vertical-align: middle !important;
+            border: 1px solid #999 !important;
+            line-height: 1.25 !important;
+        }
+        thead { display: table-header-group !important; } /* Repetir cabecera en cada página */
+        tfoot { display: table-footer-group !important; }
+        tr { page-break-inside: avoid !important; }
+        thead tr {
+            background: #1a237e !important;
+            color: white !important;
+        }
+        thead th {
+            color: white !important;
+            font-size: 9px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+            padding: 6px 4px !important;
+        }
+
+        /* Anchos óptimos por columna (suman 100%) — 14 columnas visibles tras ocultar Acciones */
+        table thead th:nth-child(1),  table tbody td:nth-child(1)  { width: 5.5%; }   /* Fecha */
+        table thead th:nth-child(2),  table tbody td:nth-child(2)  { width: 6.5%; }   /* Cédula */
+        table thead th:nth-child(3),  table tbody td:nth-child(3)  { width: 10%;  }   /* Estudiante */
+        table thead th:nth-child(4),  table tbody td:nth-child(4)  { width: 9%;   }   /* Curso */
+        table thead th:nth-child(5),  table tbody td:nth-child(5)  { width: 6%;   }   /* Modalidad */
+        table thead th:nth-child(6),  table tbody td:nth-child(6)  { width: 8%;   }   /* Jornada */
+        table thead th:nth-child(7),  table tbody td:nth-child(7)  { width: 5.5%; }   /* Día */
+        table thead th:nth-child(8),  table tbody td:nth-child(8)  { width: 5%;   }   /* Valor curso */
+        table thead th:nth-child(9),  table tbody td:nth-child(9)  { width: 5%;   }   /* Pagado */
+        table thead th:nth-child(10), table tbody td:nth-child(10) { width: 11%;  }   /* Tipo de pago */
+        table thead th:nth-child(11), table tbody td:nth-child(11) { width: 11%;  }   /* Método */
+        table thead th:nth-child(12), table tbody td:nth-child(12) { width: 5%;   }   /* Saldo */
+        table thead th:nth-child(13), table tbody td:nth-child(13) { width: 5.5%; }   /* Estado */
+        table thead th:nth-child(14), table tbody td:nth-child(14) { width: 7%;   }   /* Asistencia */
+
+        /* Chips de pago: que no se desborden y queden legibles */
+        .payment-summary { gap: 2px !important; min-width: 0 !important; }
+        .payment-chip {
+            background: #f5f7ff !important;
+            border: 1px solid #ccc !important;
+            color: #1a237e !important;
+            font-size: 8.5px !important;
+            padding: 2px 4px !important;
+            display: block !important;
+            width: 100% !important;
+            text-align: left !important;
+        }
+        .payment-chip strong { color: #2e7d32 !important; font-size: 8.5px !important; }
+
+        .badge {
+            font-size: 8.5px !important;
+            padding: 2px 5px !important;
+            border: 1px solid #ccc !important;
+            background: #fff !important;
+            color: #000 !important;
+        }
+        .badge-pagado    { background:#e8f5e9 !important; color:#2e7d32 !important; border-color:#a5d6a7 !important; }
+        .badge-parcial   { background:#fff8e1 !important; color:#856404 !important; border-color:#ffe082 !important; }
+        .badge-pendiente { background:#ffebee !important; color:#c62828 !important; border-color:#ef9a9a !important; }
+        .badge-online, .badge-presencial { background:#fff !important; color:#000 !important; border:1px solid #ccc !important; }
+
+        .jornada-cell { min-width: 0 !important; font-size: 9px !important; }
+        .jornada-cell small { font-size: 8px !important; }
+
+        .asistencia-line {
+            min-height: 22px;
+            min-width: 0;
+            width: 100%;
+            border-bottom: 1px solid #555;
+        }
+    }
+    /* Encabezado de impresión: oculto en pantalla, visible al imprimir */
+    .print-header { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp; Pagos
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:8px;" class="toolbar-row">
+    <div>
+        <h2 class="page-title">💳 Estado de Pagos</h2>
+        <p class="page-subtitle">
+            Centro financiero de matrículas. Filtra por estado, curso, modalidad o año.
+        </p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="{% url 'academia:pagos_por_modulo' %}" class="btn btn-primary">
+            📊 Por Módulo
+        </a>
+        <a href="{% url 'academia:recuperaciones_lista' %}" class="btn btn-warning"
+           style="background:#f0ad4e; color:white; text-decoration:none;">
+            ✱ Recuperaciones
+        </a>
+        <a href="{% url 'academia:hoja_recaudacion' %}" class="btn btn-secondary">
+            🖨️ Hoja Recaudación
+        </a>
+        <a href="{% url 'academia:pagos_export' %}?estado={{ filtros.estado }}&curso={{ filtros.curso }}&modalidad={{ filtros.modalidad }}&anio={{ filtros.anio }}&q={{ filtros.q }}"
+           class="btn btn-success">
+            📥 Excel
+        </a>
+        <a href="{% url 'academia:pagos_export_pdf' %}?estado={{ filtros.estado }}&curso={{ filtros.curso }}&modalidad={{ filtros.modalidad }}&anio={{ filtros.anio }}&q={{ filtros.q }}"
+           class="btn btn-secondary">
+            📄 PDF
+        </a>
+        <button type="button" onclick="window.print()" class="btn btn-secondary no-print">
+            🖨️ Imprimir
+        </button>
+    </div>
+</div>
+
+{# ─── Tarjetas de resumen ──────────────────────────────── #}
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:24px;">
+
+    <a href="?estado=Pagado" style="text-decoration:none;">
+        <div class="card-box" style="border-top:4px solid #2e7d32; padding:16px; cursor:pointer; {% if filtros.estado == 'Pagado' %}box-shadow:0 0 0 2px #2e7d32;{% endif %}">
+            <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">PAGADO</div>
+            <div style="font-size:26px; font-weight:700; color:#2e7d32; margin-top:4px;">{{ conteo_estado.Pagado }}</div>
+            <div style="font-size:12px; color:#666; margin-top:4px;">Sin saldo pendiente</div>
+            <br>
+            <hr>
+            <br>
+            <div style="font-size:12px; color:#666; margin-top:2px;">Clic para ver detalles</div>
+        </div>
+    </a>
+
+    <a href="?estado=Parcial" style="text-decoration:none;">
+        <div class="card-box" style="border-top:4px solid #f0ad4e; padding:16px; cursor:pointer; {% if filtros.estado == 'Parcial' %}box-shadow:0 0 0 2px #f0ad4e;{% endif %}">
+            <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">PARCIAL</div>
+            <div style="font-size:26px; font-weight:700; color:#f0ad4e; margin-top:4px;">{{ conteo_estado.Parcial }}</div>
+            <div style="font-size:12px; color:#666; margin-top:4px;">Pago incompleto</div>
+            <br>
+            <hr>
+            <br>
+            <div style="font-size:12px; color:#666; margin-top:2px;">Clic para ver detalles</div>
+        </div>
+    </a>
+
+    <a href="?estado=Pendiente" style="text-decoration:none;">
+        <div class="card-box" style="border-top:4px solid #c62828; padding:16px; cursor:pointer; {% if filtros.estado == 'Pendiente' %}box-shadow:0 0 0 2px #c62828;{% endif %}">
+            <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">PENDIENTE</div>
+            <div style="font-size:26px; font-weight:700; color:#c62828; margin-top:4px;">{{ conteo_estado.Pendiente }}</div>
+            <div style="font-size:12px; color:#666; margin-top:4px;">Sin abonos</div>
+            <br>
+            <hr>
+            <br>
+            <div style="font-size:12px; color:#666; margin-top:2px;">Clic para ver detalles</div>
+        </div>
+    </a>
+
+    <a href="?estado=Retiro" style="text-decoration:none;">
+        <div class="card-box" style="border-top:4px solid #757575; padding:16px; cursor:pointer; {% if filtros.estado == 'Retiro' %}box-shadow:0 0 0 2px #757575;{% endif %}">
+            <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">RETIRO VOLUNTARIO</div>
+            <div style="font-size:26px; font-weight:700; color:#757575; margin-top:4px;">${{ totales.total_retiro|floatformat:2 }}</div>
+            <div style="font-size:12px; color:#666; margin-top:4px;">{{ conteo_estado.Retiro }} alumno(s) retirado(s)</div>
+            <br>
+            <hr>
+            <br>
+            <div style="font-size:12px; color:#666; margin-top:2px;">Clic para ver detalles</div>
+        </div>
+    </a>
+    <a href="{% url 'academia:comprobante_totales' %}" style="text-decoration:none;">
+        <div class="card-box" style="border-top:4px solid #FFD700; padding:16px; cursor:pointer; transition: transform 0.15s;"
+             onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">RANKING ASESORAS</div>
+            <div style="font-size:22px; font-weight:700; color:#1a237e; margin-top:4px;">🏆 Totales</div>
+            <div style="font-size:12px; color:#666; margin-top:4px;">Ver desempeño del equipo</div>
+            <br>
+            <hr>
+            <br>
+            <div style="font-size:12px; color:#666; margin-top:2px;">Clic para ver detalles</div>
+        </div>
+    </a>
+
+    <div class="card-box" style="border-top:4px solid #1a237e; padding:16px;">
+        <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">FACTURADO</div>
+        <div style="font-size:22px; font-weight:700; color:#1a237e; margin-top:4px;">${{ totales.total_facturado|floatformat:2 }}</div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">{{ totales.total_matriculas }} matrícula{{ totales.total_matriculas|pluralize }}</div>
+    </div>
+
+    <div class="card-box" style="border-top:4px solid #2e7d32; padding:16px;">
+        <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">COBRADO</div>
+        <div style="font-size:22px; font-weight:700; color:#2e7d32; margin-top:4px;">${{ totales.total_cobrado|floatformat:2 }}</div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">Ingresos efectivos</div>
+    </div>
+
+    <div class="card-box" style="border-top:4px solid #c62828; padding:16px;">
+        <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">POR COBRAR</div>
+        <div style="font-size:22px; font-weight:700; color:#c62828; margin-top:4px;">${{ totales.total_pendiente|floatformat:2 }}</div>
+        <div style="font-size:12px; color:#666; margin-top:4px;">Saldo total</div>
+    </div>
+
+</div>
+
+{# ─── Filtros ──────────────────────────────────────────── #}
+<div class="card-box" style="margin-bottom:18px; padding:16px;">
+    <form method="get" style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; gap:10px; align-items:end;">
+
+        <div>
+            <label class="form-label" style="font-size:11px;">Buscar por curso, cédula o nombre</label>
+            <input type="text" name="q" value="{{ filtros.q }}"
+                   placeholder="Ej.: Excel, 0102030405…" class="form-input">
+        </div>
+
+        <div>
+            <label class="form-label" style="font-size:11px;">Estado</label>
+            <select name="estado" class="form-input">
+                <option value="">— Todos —</option>
+                <option value="Pagado" {% if filtros.estado == 'Pagado' %}selected{% endif %}>Pagado</option>
+                <option value="Parcial" {% if filtros.estado == 'Parcial' %}selected{% endif %}>Parcial</option>
+                <option value="Pendiente" {% if filtros.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+                <option value="Retiro" {% if filtros.estado == 'Retiro' %}selected{% endif %}>Retiro voluntario</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="form-label" style="font-size:11px;">Curso</label>
+            <select name="curso" class="form-input">
+                <option value="">— Todos —</option>
+                {% for c in cursos %}
+                    <option value="{{ c.id }}" {% if filtros.curso == c.id|stringformat:"s" %}selected{% endif %}>
+                        {{ c.nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="form-label" style="font-size:11px;">Modalidad</label>
+            <select name="modalidad" class="form-input">
+                <option value="">— Todas —</option>
+                <option value="presencial" {% if filtros.modalidad == 'presencial' %}selected{% endif %}>Presencial</option>
+                <option value="online" {% if filtros.modalidad == 'online' %}selected{% endif %}>Online</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="form-label" style="font-size:11px;">Año</label>
+            <select name="anio" class="form-input">
+                <option value="">— Todos —</option>
+                {% for a in anios %}
+                    <option value="{{ a }}" {% if filtros.anio == a|stringformat:"s" %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="display:flex; gap:6px;">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a href="{% url 'academia:pagos_lista' %}" class="btn btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</div>
+
+{# ─── Tabla ────────────────────────────────────────────── #}
+<div class="print-header" style="margin-bottom:8px; text-align:center;">
+    <h2 class="page-title" style="font-size:16px; color:#1a237e; margin:0;">💳 Estado de Pagos — Formación Profesional EC</h2>
+    <div style="font-size:10px; color:#444; margin-top:2px;">
+        Generado: {% now "d/m/Y H:i" %}
+        {% if filtros.estado %} · Estado: {{ filtros.estado }}{% endif %}
+        {% if filtros.anio %} · Año: {{ filtros.anio }}{% endif %}
+        · Total registros: {{ matriculas|length }}
+    </div>
+</div>
+<div class="table-wrap">
+    {% if matriculas %}
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Cédula</th>
+                <th>Estudiante</th>
+                <th>Curso</th>
+                <th>Modalidad</th>
+                <th>Jornada</th>
+                <th>Día</th>
+                <th>Valor curso</th>
+                <th>Pagado</th>
+                <th>Tipo de pago</th>
+                <th>Método</th>
+                <th>Saldo</th>
+                <th>Estado</th>
+                <th>Asistencia</th>
+                <th class="no-print">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in matriculas %}
+            <tr>
+                <td>{{ m.fecha_matricula|date:"d/m/Y" }}</td>
+                <td><strong>{{ m.estudiante.cedula }}</strong></td>
+                <td>{{ m.estudiante.apellidos }} {{ m.estudiante.nombres }}</td>
+                <td>{{ m.curso.nombre }}</td>
+                <td>
+                    <span class="badge badge-{{ m.modalidad }}">
+                        {% if m.modalidad == 'online' %}🟢{% else %}🏫{% endif %}
+                        {{ m.get_modalidad_display }}
+                    </span>
+                </td>
+                <td class="jornada-cell">
+                    {% if m.jornada %}
+                        <strong>{{ m.jornada.descripcion_legible }}</strong>
+                        {% if m.jornada.hora_inicio and m.jornada.hora_fin %}
+                            <div><small>{{ m.jornada.hora_inicio|time:"H:i" }} – {{ m.jornada.hora_fin|time:"H:i" }}</small></div>
+                        {% endif %}
+                        {% if m.jornada.ciudad %}
+                            <div><small>{{ m.jornada.ciudad }}</small></div>
+                        {% endif %}
+                    {% else %}
+                        <span style="color:#999;">—</span>
+                    {% endif %}
+                </td>
+                <td class="jornada-cell" style="text-align:center;">
+                    {% if m.jornada and m.jornada.fecha_inicio %}
+                        <strong>{{ m.jornada.fecha_inicio|date:"d/m/Y" }}</strong>
+                    {% else %}
+                        <span style="color:#999;">—</span>
+                    {% endif %}
+                </td>
+                <td>${{ m.valor_curso|floatformat:2 }}</td>
+                <td><strong style="color:#2e7d32;">${{ m.valor_pagado|floatformat:2 }}</strong></td>
+                <td>
+                    <div class="payment-summary">
+                        {% for item in m.resumen_abonos.tipos %}
+                            <span class="payment-chip">
+                                {{ item.label }}
+                                <strong>${{ item.total|floatformat:2 }}</strong>
+                            </span>
+                        {% empty %}
+                            <span class="payment-empty">Sin pagos</span>
+                        {% endfor %}
+                    </div>
+                </td>
+                <td>
+                    <div class="payment-summary">
+                        {% for item in m.resumen_abonos.metodos %}
+                            <span class="payment-chip">
+                                {{ item.label }}
+                                <strong>${{ item.total|floatformat:2 }}</strong>
+                            </span>
+                        {% empty %}
+                            <span class="payment-empty">Sin método</span>
+                        {% endfor %}
+                    </div>
+                </td>
+                <td><strong style="color:{% if m.saldo > 0 %}#c62828{% else %}#2e7d32{% endif %};">${{ m.saldo|floatformat:2 }}</strong></td>
+                <td>
+                    {% if m.estado_pago == 'Retiro' %}
+                        <span class="badge" style="background:#f5f5f5; color:#616161; border:1px solid #e0e0e0;">Retiro</span>
+                    {% elif m.estado_pago == 'Pagado' %}
+                        <span class="badge badge-pagado">✓ Pagado</span>
+                    {% elif m.estado_pago == 'Parcial' %}
+                        <span class="badge badge-parcial">◐ Parcial</span>
+                    {% else %}
+                        <span class="badge badge-pendiente">○ Pendiente</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="asistencia-line"></span>
+                </td>
+                <td class="no-print" style="white-space:nowrap;">
+                    <a href="{% url 'academia:matricula_abonos' m.pk %}"
+                       class="btn btn-success btn-sm" title="Gestionar pagos">💵 Gestionar Pagos</a>
+                    
+                    {% if m.estudiante.celular_wa %}
+                    <a href="https://wa.me/{{ m.estudiante.celular_wa }}?text=Mi+estimado%2Fa+{{ m.estudiante.nombres|urlencode }}%2C+le+saluda+Formaci%C3%B3n+Profesional+EC.+Notamos+que+no+asisti%C3%B3+a+su+clase+del+d%C3%ADa+de+hoy+del+curso+{{ m.curso.nombre|urlencode }}.+%C2%BFSucedi%C3%B3+alg%C3%BAn+inconveniente%3F+Quedamos+atentos.+%F0%9F%99%8F"
+                       target="_blank" rel="noopener"
+                       class="btn btn-sm" style="background:#25d366; color:white; padding: 5px 8px; font-size:12px; text-decoration:none; border-radius:4px;" title="Notificar inasistencia">💬</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <div class="empty-state">
+            <p style="font-size:15px;">No hay matrículas con los filtros aplicados.</p>
+            <a href="{% url 'academia:pagos_lista' %}" class="btn btn-secondary" style="margin-top:12px;">Limpiar filtros</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+
+{% block title %}Clases en Recuperación{% endblock %}
+
+{% block extra_head %}
+<style>
+    .recup-pay {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        white-space: normal;
+        min-width: 150px;
+    }
+    .recup-pay strong { color: #2e7d32; }
+    .recup-pay small { color: #666; font-size: 11px; }
+    .recup-print-title { display: none; }
+    /* Casilla de asistencia / firma — línea para escribir */
+    .asistencia-cell {
+        display: block;
+        min-height: 28px;
+        min-width: 110px;
+        border-bottom: 1px solid #999;
+    }
+    @media print {
+        body { background: white !important; }
+        header, nav, .crumb, .no-print, .row-actions { display: none !important; }
+        .container { max-width: none !important; padding: 12px !important; }
+        .recup-print-title { display: block; text-align: center; margin-bottom: 12px; }
+        .table-wrap { box-shadow: none !important; border-radius: 0 !important; overflow: visible !important; }
+        table { font-size: 10px !important; }
+        th, td { padding: 6px 7px !important; white-space: normal !important; }
+        thead tr { background: #1a237e !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .asistencia-cell { min-height: 22px; min-width: 90px; border-bottom: 1px solid #555; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crumb no-print">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:pagos_lista' %}">Pagos</a> &nbsp;›&nbsp;
+    Clases en Recuperación
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+    <div>
+        <h2 class="page-title">✱ Clases en Recuperación</h2>
+        <p class="page-subtitle">
+            Estudiantes que faltaron a una clase y deben recuperarla. Cuando vienen a recuperar,
+            cobra la clase desde aquí.
+        </p>
+    </div>
+    <div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="{% url 'academia:recuperaciones_export_excel' %}?estado={{ filtros.estado }}&curso={{ filtros.curso }}&q={{ filtros.q|urlencode }}"
+           class="btn btn-success">📊 Excel</a>
+        <a href="{% url 'academia:recuperaciones_export_pdf' %}?estado={{ filtros.estado }}&curso={{ filtros.curso }}&q={{ filtros.q|urlencode }}"
+           class="btn btn-secondary">📄 PDF</a>
+        <button type="button" onclick="window.print()" class="btn btn-secondary">🖨️ Imprimir</button>
+    </div>
+</div>
+
+<div class="recup-print-title">
+    <h2>Clases en Recuperación</h2>
+    <p>Estado: {{ filtros.estado|title }} · Registros: {{ recuperaciones|length }}</p>
+</div>
+
+{# ─── Tarjetas resumen ───────────────────────── #}
+<div class="no-print" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:18px;">
+    <a href="?estado=pendientes" style="text-decoration:none;">
+        <div class="card-box" style="padding:16px; border-top:4px solid #f0ad4e; cursor:pointer; {% if estado == 'pendientes' %}box-shadow:0 0 0 2px #f0ad4e;{% endif %}">
+            <div style="font-size:11px; color:#888; font-weight:600;">PENDIENTES</div>
+            <div style="font-size:26px; font-weight:700; color:#f0ad4e; margin-top:4px;">{{ total_pendientes }}</div>
+            <div style="font-size:12px; color:#666; margin-top:4px;">Por cobrar / recuperar</div>
+        </div>
+    </a>
+    <a href="?estado=pagadas" style="text-decoration:none;">
+        <div class="card-box" style="padding:16px; border-top:4px solid #2e7d32; cursor:pointer; {% if estado == 'pagadas' %}box-shadow:0 0 0 2px #2e7d32;{% endif %}">
+            <div style="font-size:11px; color:#888; font-weight:600;">YA PAGADAS</div>
+            <div style="font-size:26px; font-weight:700; color:#2e7d32; margin-top:4px;">{{ total_pagadas }}</div>
+            <div style="font-size:12px; color:#666; margin-top:4px;">Recuperaciones cobradas</div>
+        </div>
+    </a>
+</div>
+
+{# ─── Filtros ───────────────────────────────── #}
+<div class="card-box no-print" style="margin-bottom:18px; padding:16px;">
+    <form method="get" style="display:grid; grid-template-columns: 2fr 1fr 2fr auto; gap:10px; align-items:end;">
+        <div>
+            <label class="form-label" style="font-size:11px;">Buscar por cédula o nombre</label>
+            <input type="text" name="q" value="{{ filtros.q }}" placeholder="Ej.: 0102030405..." class="form-input">
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Estado</label>
+            <select name="estado" class="form-input">
+                <option value="pendientes" {% if filtros.estado == 'pendientes' %}selected{% endif %}>Pendiente</option>
+                <option value="pagadas" {% if filtros.estado == 'pagadas' %}selected{% endif %}>Pagado</option>
+                <option value="todas" {% if filtros.estado == 'todas' %}selected{% endif %}>Todos</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Curso</label>
+            <select name="curso" class="form-input">
+                <option value="">— Todos —</option>
+                {% for c in cursos %}
+                <option value="{{ c.pk }}" {% if filtros.curso == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a href="{% url 'academia:recuperaciones_lista' %}" class="btn btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</div>
+
+{# ─── Tabla ──────────────────────────────────── #}
+<div class="table-wrap">
+    {% if recuperaciones %}
+    <table>
+        <thead>
+            <tr>
+                <th>Estudiante</th>
+                <th>Curso</th>
+                <th>Módulo</th>
+                <th>Fecha falta</th>
+                <th>Saldo arrastrado</th>
+                <th>Estado</th>
+                <th>Pago recuperación</th>
+                <th>Observaciones</th>
+                <th>Asistencia</th>
+                <th class="no-print">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in recuperaciones %}
+            <tr {% if r.pagada %}style="background:#f9f9f9;"{% endif %}>
+                <td>
+                    <div style="font-weight:600; color:#1a237e;">{{ r.matricula.estudiante.nombre_completo }}</div>
+                    <div style="font-size:11px; color:#888;">{{ r.matricula.estudiante.cedula }}</div>
+                </td>
+                <td>
+                    <strong>{{ r.matricula.curso.nombre }}</strong>
+                    <div style="font-size:11px; color:#666;">{{ r.matricula.get_modalidad_display }}</div>
+                </td>
+                <td style="text-align:center;">
+                    <span style="background:#1a237e; color:white; padding:3px 10px; border-radius:8px; font-weight:700;">
+                        Mód. {{ r.numero_modulo }}
+                    </span>
+                </td>
+                <td>{{ r.fecha_marcada|date:"d/m/Y" }}</td>
+                <td style="font-weight:700; color:{% if r.saldo_pendiente_al_marcar > 0 %}#c62828{% else %}#2e7d32{% endif %};">
+                    ${{ r.saldo_pendiente_al_marcar|floatformat:2 }}
+                </td>
+                <td>
+                    {% if r.pagada %}
+                    <span class="badge badge-pagado">✓ Pagada</span>
+                    <div style="font-size:11px; color:#666; margin-top:2px;">{{ r.fecha_recuperacion|date:"d/m/Y" }}</div>
+                    {% if r.abono %}<div style="font-size:10px; color:#888;">{{ r.abono.numero_recibo }}</div>{% endif %}
+                    {% else %}
+                    <span class="badge badge-pendiente">○ Pendiente</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="recup-pay">
+                        {% if r.abono %}
+                            <strong>${{ r.abono.monto|floatformat:2 }}</strong>
+                            <small>{{ r.abono.get_tipo_pago_display }} · {{ r.abono.get_metodo_display }}</small>
+                            {% if r.abono.banco %}
+                                <small>{{ r.abono.get_banco_display }}</small>
+                            {% endif %}
+                            {% if not r.abono.cuenta_para_saldo %}
+                                <small>Cobro aparte</small>
+                            {% endif %}
+                        {% else %}
+                            <strong style="color:#c62828;">Por cobrar</strong>
+                            <small>Sin pago registrado</small>
+                        {% endif %}
+                    </div>
+                </td>
+                <td style="font-size:12px; color:#666; max-width:200px;">
+                    {{ r.observaciones|default:"—"|truncatewords:8 }}
+                </td>
+                <td>
+                    <span class="asistencia-cell"></span>
+                </td>
+                <td class="no-print">
+                    <div class="row-actions">
+                        <a href="{% url 'academia:matricula_abonos' r.matricula.pk %}"
+                            class="btn btn-secondary btn-sm">Ver matrícula</a>
+                        {% if not r.pagada %}
+                        <a href="{% url 'academia:recuperacion_cobrar' r.pk %}"
+                            class="btn btn-success btn-sm">💵 Cobrar</a>
+                        <form method="post" action="{% url 'academia:recuperacion_eliminar' r.pk %}"
+                            style="display:inline;" onsubmit="return false;">
+                            {% csrf_token %}
+                            <button type="button" class="btn btn-danger btn-sm"
+                                onclick="confirmarAccion(this.closest('form'), '¿Eliminar esta recuperación pendiente?', 'danger')">×</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state" style="padding:40px; text-align:center;">
+        <p style="font-size:15px; color:#666;">
+            {% if estado == 'pendientes' %}
+            No hay clases pendientes de recuperación. ✓
+            {% else %}
+            No hay recuperaciones que coincidan con los filtros.
+            {% endif %}
+        </p>
+        <p style="font-size:13px; color:#888; margin-top:8px;">
+            Para marcar una clase a recuperación, ve a la matrícula del estudiante y usa el botón
+            "✱ Marcar clase a recuperación".
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

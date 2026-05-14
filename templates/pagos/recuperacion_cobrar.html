@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+
+{% block title %}Cobrar recuperación{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:recuperaciones_lista' %}">Clases en Recuperación</a> &nbsp;›&nbsp;
+    Cobrar
+</div>
+
+<h2 class="page-title">💵 Cobrar Clase de Recuperación</h2>
+
+<div class="card-box" style="max-width:680px; padding:24px; margin-top:14px;">
+
+    {# ── Cabecera con datos del estudiante y saldo arrastrado ── #}
+    <div style="background:#fff8e1; border-left:4px solid #f0ad4e; padding:16px; border-radius:8px; margin-bottom:20px;">
+        <div style="font-weight:700; color:#1a237e; font-size:16px;">{{ recuperacion.matricula.estudiante.nombre_completo }}</div>
+        <div style="font-size:13px; color:#666; margin-top:4px;">
+            {{ recuperacion.matricula.estudiante.cedula }} · {{ recuperacion.matricula.curso.nombre }}
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-top:12px; font-size:13px;">
+            <div>
+                <div style="font-size:10px; color:#888; text-transform:uppercase;">Módulo a recuperar</div>
+                <div style="font-size:18px; font-weight:700; color:#1a237e;">Mód. {{ recuperacion.numero_modulo }}</div>
+            </div>
+            <div>
+                <div style="font-size:10px; color:#888; text-transform:uppercase;">Fecha de la falta</div>
+                <div style="font-size:14px; font-weight:600;">{{ recuperacion.fecha_marcada|date:"d/m/Y" }}</div>
+            </div>
+            <div>
+                <div style="font-size:10px; color:#888; text-transform:uppercase;">Saldo arrastrado</div>
+                <div style="font-size:18px; font-weight:700; color:{% if recuperacion.saldo_pendiente_al_marcar > 0 %}#c62828{% else %}#2e7d32{% endif %};">
+                    ${{ recuperacion.saldo_pendiente_al_marcar|floatformat:2 }}
+                </div>
+            </div>
+        </div>
+        {% if recuperacion.observaciones %}
+        <div style="margin-top:10px; font-size:12px; color:#666; font-style:italic;">
+            "{{ recuperacion.observaciones }}"
+        </div>
+        {% endif %}
+    </div>
+
+    {# ── Saldo actual de la matrícula (puede haber cambiado desde que se marcó) ── #}
+    <div style="background:#f5f7ff; padding:12px; border-radius:8px; margin-bottom:20px; font-size:13px;">
+        <strong style="color:#1a237e;">Estado actual de la matrícula:</strong>
+        Valor neto <strong>${{ matricula.valor_neto|floatformat:2 }}</strong> ·
+        Pagado <strong style="color:#2e7d32;">${{ matricula.valor_pagado|floatformat:2 }}</strong> ·
+        Saldo <strong style="color:{% if matricula.saldo > 0 %}#c62828{% else %}#2e7d32{% endif %};">${{ matricula.saldo|floatformat:2 }}</strong>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+            <div class="flash flash-error" style="margin-bottom:16px;">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        {# Campos ocultos: tipo_pago y numero_modulo van forzados desde la vista #}
+        <input type="hidden" name="tipo_pago" value="recuperacion">
+        <input type="hidden" name="numero_modulo" value="{{ recuperacion.numero_modulo }}">
+
+        {# ── ¿Suma al saldo o se cobra aparte? (clave del flujo) ── #}
+        <div style="background:#fff3e0; border:1px solid #f0ad4e; border-radius:8px; padding:14px; margin-bottom:18px;">
+            <label class="form-label" style="color:#c9a227; font-size:14px;">
+                ¿Cómo se cobra esta recuperación? *
+            </label>
+            {{ form.cuenta_para_saldo }}
+            {{ form.cuenta_para_saldo.errors }}
+            <small style="color:#666; font-size:12px; display:block; margin-top:8px;">
+                <strong>Sí, sumar al pago del curso:</strong> el monto se agrega al valor pagado y reduce el saldo. <br>
+                <strong>No, cobrar aparte:</strong> el monto se registra como ingreso adicional pero NO afecta el saldo del curso.
+            </small>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
+            <div>
+                <label class="form-label">Fecha *</label>
+                {{ form.fecha }}
+                {{ form.fecha.errors }}
+            </div>
+            <div>
+                <label class="form-label">Monto (USD) *</label>
+                {{ form.monto }}
+                {{ form.monto.errors }}
+                <small style="color:#666; font-size:11px;">Sugerido $25, ajusta libremente.</small>
+            </div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label class="form-label">Método de pago *</label>
+            {{ form.metodo }}
+            {{ form.metodo.errors }}
+        </div>
+
+        <div id="bloque-banco" style="margin-bottom:14px; display:none; background:#f5f7ff; border:1px solid #c5cae9; border-radius:8px; padding:12px;">
+            <label class="form-label" style="color:#1a237e;">🏦 Banco *</label>
+            {{ form.banco }}
+            {{ form.banco.errors }}
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label class="form-label">Nº de recibo (opcional, se autogenera)</label>
+            {{ form.numero_recibo }}
+        </div>
+
+        <div style="margin-bottom:18px;">
+            <label class="form-label">Observaciones</label>
+            {{ form.observaciones }}
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+            <a href="{% url 'academia:recuperaciones_lista' %}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-success">💵 Cobrar recuperación</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Banco visible solo si método es transferencia/tarjeta, con lógica para Payphone
+    (function () {
+        const metodoSel = document.getElementById('id_metodo');
+        const bloqueBanco = document.getElementById('bloque-banco');
+        if (!metodoSel || !bloqueBanco) return;
+
+        function actualizar() {
+            const bancoSel = document.getElementById('id_banco');
+            const labelBanco = bloqueBanco.querySelector('label');
+            
+            if (metodoSel.value === 'transferencia') {
+                bloqueBanco.style.display = 'block';
+                if (labelBanco) labelBanco.innerText = '🏦 Banco *';
+                if (bancoSel) {
+                    Array.from(bancoSel.options).forEach(opt => {
+                        if (opt.value === 'payphone') {
+                            opt.style.display = 'none';
+                        } else {
+                            opt.style.display = '';
+                        }
+                    });
+                    if (bancoSel.value === 'payphone') bancoSel.value = '';
+                }
+            } else if (metodoSel.value === 'tarjeta') {
+                bloqueBanco.style.display = 'block';
+                if (labelBanco) labelBanco.innerText = '💳 Tarjeta / App *';
+                if (bancoSel) {
+                    Array.from(bancoSel.options).forEach(opt => {
+                        if (opt.value === 'payphone' || opt.value === '') {
+                            opt.style.display = '';
+                        } else {
+                            opt.style.display = 'none';
+                        }
+                    });
+                    if (bancoSel.value !== 'payphone') bancoSel.value = 'payphone';
+                }
+            } else {
+                bloqueBanco.style.display = 'none';
+                if (bancoSel) bancoSel.value = '';
+            }
+        }
+        
+        metodoSel.addEventListener('change', actualizar);
+        actualizar();
+    })();
+</script>
+{% endblock %}
