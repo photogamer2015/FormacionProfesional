@@ -23,6 +23,17 @@
 <form method="post" class="card-box" novalidate id="form-adicional-externo">
     {% csrf_token %}
 
+    {% if form.non_field_errors %}
+    <div style="background:#ffebee; border-left:4px solid #c62828; padding:12px 16px; margin-bottom:18px; border-radius:6px;">
+        <strong style="color:#c62828;">Corrige los siguientes errores:</strong>
+        <ul style="margin-top:6px; margin-bottom:0; padding-left:20px; color:#c62828; font-size:14px;">
+            {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
     {# ── Selección de la persona ── #}
     <h3 class="form-section-title">Persona Externa</h3>
     <div class="form-grid">
@@ -180,6 +191,16 @@
                             ${d.ciudad ? ' · 🏙 ' + d.ciudad : ''}
                         </span>
                     `;
+                } else if (d.es_estudiante) {
+                    status.textContent = '⚠️ es estudiante';
+                    status.style.color = '#e65100';
+                    infoBox.innerHTML = `
+                        <div style="background:#fff3e0; padding:10px; border-radius:6px; border-left:3px solid #ff9800;">
+                            <strong style="color:#e65100;">${d.nombre_estudiante}</strong> es un <strong style="color:#e65100;">ESTUDIANTE INTERNO</strong>.<br>
+                            Debes registrar este adicional en la sección correcta.
+                        </div>
+                        <a href="{% url 'academia:adicional_crear_interno' %}?cedula=${encodeURIComponent(ced)}" class="btn btn-warning btn-sm" style="margin-top:8px;">Ir a Estudiante Interno</a>
+                    `;
                 } else {
                     status.textContent = '✗ no existe';
                     status.style.color = '#c62828';
@@ -187,7 +208,7 @@
                         <span style="color:#c62828;">
                             No existe una persona externa con esa cédula.
                         </span>
-                        <br><a href="{% url 'academia:persona_externa_crear' %}" class="btn btn-primary btn-sm" style="margin-top:6px;">＋ Registrar nueva</a>
+                        <br><a href="{% url 'academia:persona_externa_crear' %}?cedula=${encodeURIComponent(ced)}" class="btn btn-primary btn-sm" style="margin-top:6px;">＋ Registrar nueva</a>
                     `;
                 }
             })

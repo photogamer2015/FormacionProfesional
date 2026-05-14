@@ -354,34 +354,58 @@ def persona_externa_eliminar(request, pk):
 def api_estudiante_existe(request, cedula):
     """Endpoint AJAX: devuelve datos del estudiante por cédula (para autocompletar)."""
     try:
-        est = Estudiante.objects.get(cedula=cedula.strip())
-        return JsonResponse({
-            'existe': True,
-            'apellidos': est.apellidos,
-            'nombres': est.nombres,
-            'correo': est.correo or '',
-            'celular': est.celular or '',
-            'ciudad': est.ciudad or '',
-        })
-    except Estudiante.DoesNotExist:
-        return JsonResponse({'existe': False})
+        est = Estudiante.objects.filter(cedula=cedula.strip()).first()
+        if est:
+            return JsonResponse({
+                'existe': True,
+                'apellidos': est.apellidos,
+                'nombres': est.nombres,
+                'correo': est.correo or '',
+                'celular': est.celular or '',
+                'ciudad': est.ciudad or '',
+            })
+            
+        # Check if it's actually a Persona Externa
+        p = PersonaExterna.objects.filter(cedula=cedula.strip()).first()
+        if p:
+            return JsonResponse({
+                'existe': False,
+                'es_externa': True,
+                'nombre_externo': p.nombre_completo,
+            })
+            
+        return JsonResponse({'existe': False, 'es_externa': False})
+    except Exception as e:
+        return JsonResponse({'existe': False, 'error': str(e)})
 
 
 @matricula_requerida
 def api_persona_externa(request, cedula):
     """Endpoint AJAX: devuelve datos de una persona externa por cédula."""
     try:
-        p = PersonaExterna.objects.get(cedula=cedula.strip())
-        return JsonResponse({
-            'existe': True,
-            'apellidos': p.apellidos,
-            'nombres': p.nombres,
-            'correo': p.correo or '',
-            'celular': p.celular or '',
-            'ciudad': p.ciudad or '',
-        })
-    except PersonaExterna.DoesNotExist:
-        return JsonResponse({'existe': False})
+        p = PersonaExterna.objects.filter(cedula=cedula.strip()).first()
+        if p:
+            return JsonResponse({
+                'existe': True,
+                'apellidos': p.apellidos,
+                'nombres': p.nombres,
+                'correo': p.correo or '',
+                'celular': p.celular or '',
+                'ciudad': p.ciudad or '',
+            })
+        
+        # Check if it's actually an Estudiante Interno
+        est = Estudiante.objects.filter(cedula=cedula.strip()).first()
+        if est:
+            return JsonResponse({
+                'existe': False,
+                'es_estudiante': True,
+                'nombre_estudiante': est.nombre_completo,
+            })
+            
+        return JsonResponse({'existe': False, 'es_estudiante': False})
+    except Exception as e:
+        return JsonResponse({'existe': False, 'error': str(e)})
 
 
 # ─────────────────────────────────────────────────────────

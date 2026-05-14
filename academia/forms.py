@@ -777,6 +777,24 @@ class PersonaExternaForm(forms.ModelForm):
         self.fields['ciudad'].required = False
         self.fields['observaciones'].required = False
 
+    def clean_cedula(self):
+        cedula = (self.cleaned_data.get('cedula') or '').strip()
+        if not cedula:
+            return cedula
+
+        # Validar que no sea un estudiante ya registrado
+        if Estudiante.objects.filter(cedula=cedula).exists():
+            raise forms.ValidationError(
+                'Esta cédula ya pertenece a un ESTUDIANTE matriculado. '
+                'Debes registrar el adicional en la opción "Estudiante Interno".'
+            )
+
+        # Si estamos creando, validar que no exista otra persona externa
+        if not self.instance.pk and PersonaExterna.objects.filter(cedula=cedula).exists():
+            raise forms.ValidationError('Ya existe una persona externa registrada con esta cédula.')
+
+        return cedula
+
 
 class _AdicionalBaseForm(forms.ModelForm):
     """
