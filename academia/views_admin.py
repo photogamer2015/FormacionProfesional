@@ -20,7 +20,10 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .forms import EgresoForm
-from .models import Abono, Adicional, CategoriaEgreso, Comprobante, Egreso, Matricula
+from .models import (
+    Abono, AbonoArchivado, Adicional, CategoriaEgreso, CierreAdministrativo,
+    CierreCurso, Comprobante, Egreso, Matricula,
+)
 from .permisos import admin_requerido
 
 
@@ -43,6 +46,10 @@ def _ingresos_periodo(desde, hasta):
     Suma todos los ingresos en el rango de fechas.
     Combina:
       - Abonos (de matrículas registradas en el sistema): por fecha de abono.
+      - Abonos ARCHIVADOS (de cursos cerrados): por fecha de abono. Esto es
+        clave: cuando se cierra un curso, los Abonos vivos se borran, pero el
+        dinero que entró NO debe desaparecer del registro administrativo. Por
+        eso sumamos también los AbonoArchivado del periodo.
       - Comprobantes "manuales" (cargados desde el módulo Comprobantes sin
         crear matrícula): por fecha de inscripción, solo el pago_abono.
         IMPORTANTE: se EXCLUYEN los comprobantes vinculados a una matrícula,
@@ -52,6 +59,11 @@ def _ingresos_periodo(desde, hasta):
       - Adicionales (certificados, examen supletorio, camisas extra): por fecha.
     """
     abonos = Abono.objects.filter(
+        fecha__gte=desde, fecha__lte=hasta
+    ).aggregate(s=Sum('monto'))['s'] or Decimal('0.00')
+
+    # Abonos archivados (de cierres de curso) — conservan su fecha original
+    abonos_archivados = AbonoArchivado.objects.filter(
         fecha__gte=desde, fecha__lte=hasta
     ).aggregate(s=Sum('monto'))['s'] or Decimal('0.00')
 
@@ -68,9 +80,34 @@ def _ingresos_periodo(desde, hasta):
 
     return {
         'abonos': abonos,
+        'abonos_archivados': abonos_archivados,
         'ventas': ventas,
         'adicionales': adicionales,
-        'total': abonos + ventas + adicionales,
+        'total': abonos + abonos_archivados + ventas + adicionales,
+    }
+
+
+def _cierres_curso_periodo(desde, hasta):
+    """
+    Devuelve los cierres de curso ejecutados dentro del periodo, con sus totales.
+    Sirve para reflejar en el dashboard administrativo qué cursos se cerraron
+    y cuánto dinero representaron.
+    """
+    qs = CierreCurso.objects.filter(
+        fecha_cierre__date__gte=desde, fecha_cierre__date__lte=hasta
+    ).order_by('-fecha_cierre')
+
+    cierres = list(qs)
+    total_cobrado = sum((c.total_cobrado for c in cierres), Decimal('0.00'))
+    total_facturado = sum((c.total_facturado for c in cierres), Decimal('0.00'))
+    total_matriculas = sum((c.total_matriculas for c in cierres), 0)
+
+    return {
+        'cierres': cierres,
+        'count': len(cierres),
+        'total_cobrado': total_cobrado,
+        'total_facturado': total_facturado,
+        'total_matriculas': total_matriculas,
     }
 
 
@@ -325,6 +362,9 @@ def admin_dashboard(request):
 
     # ── Total acumulado histórico (todo el sistema) ──
     total_abonos_hist = Abono.objects.aggregate(s=Sum('monto'))['s'] or Decimal('0.00')
+    # Sumar también los abonos archivados (de cursos cerrados) para que el
+    # histórico financiero no baje al ejecutar cierres de curso.
+    total_abonos_arch_hist = AbonoArchivado.objects.aggregate(s=Sum('monto'))['s'] or Decimal('0.00')
     # Mismo criterio que `_ingresos_periodo`: solo comprobantes manuales
     # (sin matrícula vinculada) para no duplicar lo que ya está en Abonos.
     total_ventas_hist = Comprobante.objects.filter(
@@ -332,7 +372,10 @@ def admin_dashboard(request):
     ).aggregate(s=Sum('pago_abono'))['s'] or Decimal('0.00')
     total_adicionales_hist = Adicional.objects.aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
     total_egresos_hist = Egreso.objects.aggregate(s=Sum('monto'))['s'] or Decimal('0.00')
-    total_ingresos_hist = total_abonos_hist + total_ventas_hist + total_adicionales_hist
+    total_ingresos_hist = (
+        total_abonos_hist + total_abonos_arch_hist
+        + total_ventas_hist + total_adicionales_hist
+    )
     balance_hist = total_ingresos_hist - total_egresos_hist
 
     # Por cobrar: saldos pendientes (informativo, no se cuenta como ingreso).
@@ -379,6 +422,16 @@ def admin_dashboard(request):
             'seleccionado': (a == anio and m == mes),
         })
 
+    # ── Cierres de CURSO del periodo (reflejar su dinero en el panel admin) ──
+    cierres_curso_mes = _cierres_curso_periodo(desde, hasta)
+
+    # ── Cierres ADMINISTRATIVOS previos (cortes de caja ya hechos) ──
+    cierres_admin = CierreAdministrativo.objects.all()[:12]
+    # ¿Ya existe un cierre administrativo para este mes?
+    cierre_admin_existente = CierreAdministrativo.objects.filter(
+        anio=anio, mes=mes
+    ).first()
+
     return render(request, 'admin_panel/dashboard.html', {
         'anio': anio,
         'mes': mes,
@@ -416,6 +469,10 @@ def admin_dashboard(request):
         # ★ NUEVO: Adicionales del mes (KPI con +)
         'adicionales_mes': adicionales_mes,
         'var_adicionales': variacion(adicionales_mes['total'], adic_prev),
+        # ★ NUEVO: Cierres de curso y administrativos
+        'cierres_curso_mes': cierres_curso_mes,
+        'cierres_admin': cierres_admin,
+        'cierre_admin_existente': cierre_admin_existente,
         # Gráfico (JSON serializable)
         'serie_meses_json': json.dumps(serie_meses),
     })
@@ -720,3 +777,195 @@ def export_egresos(request):
     w.writerow(['', '', 'TOTAL', f'{total:.2f}'])
 
     return response
+
+
+# ═════════════════════════════════════════════════════════════════
+# CIERRE ADMINISTRATIVO (corte de caja del periodo)
+# ═════════════════════════════════════════════════════════════════
+
+@admin_requerido
+def cierre_admin_preview(request):
+    """
+    Vista previa del cierre administrativo de un mes: muestra el detalle de
+    ingresos (incluidos los archivados de cursos cerrados), egresos y balance,
+    antes de congelarlo.
+    """
+    hoy = timezone.localdate()
+    try:
+        anio = int(request.GET.get('anio', hoy.year))
+        mes = int(request.GET.get('mes', hoy.month))
+        if not (1 <= mes <= 12):
+            mes = hoy.month
+    except (TypeError, ValueError):
+        anio, mes = hoy.year, hoy.month
+
+    desde, hasta = _rango_mes(anio, mes)
+
+    ingresos = _ingresos_periodo(desde, hasta)
+    egresos_total = _egresos_periodo(desde, hasta)
+    egresos_categorias = _egresos_por_categoria_periodo(desde, hasta)
+    cierres_curso = _cierres_curso_periodo(desde, hasta)
+    balance = ingresos['total'] - egresos_total
+
+    existente = CierreAdministrativo.objects.filter(anio=anio, mes=mes).first()
+
+    meses_selector = []
+    for i in range(0, 24):
+        m = hoy.month - i
+        a = hoy.year
+        while m <= 0:
+            m += 12
+            a -= 1
+        meses_selector.append({
+            'anio': a, 'mes': m,
+            'label': f'{MESES_ES[m]} {a}',
+            'seleccionado': (a == anio and m == mes),
+        })
+
+    return render(request, 'admin_panel/cierre_admin_preview.html', {
+        'anio': anio,
+        'mes': mes,
+        'mes_nombre': MESES_ES[mes],
+        'desde': desde,
+        'hasta': hasta,
+        'ingresos': ingresos,
+        'egresos_total': egresos_total,
+        'egresos_categorias': egresos_categorias,
+        'cierres_curso': cierres_curso,
+        'balance': balance,
+        'existente': existente,
+        'meses_selector': meses_selector,
+    })
+
+
+@admin_requerido
+@require_POST
+def cierre_admin_ejecutar(request):
+    """Congela el corte de caja del mes en un CierreAdministrativo."""
+    try:
+        anio = int(request.POST.get('anio'))
+        mes = int(request.POST.get('mes'))
+        if not (1 <= mes <= 12):
+            raise ValueError
+    except (TypeError, ValueError):
+        messages.error(request, 'Periodo no válido.')
+        return redirect('academia:admin_dashboard')
+
+    etiqueta = (request.POST.get('etiqueta', '').strip())[:80]
+    observaciones = request.POST.get('observaciones', '').strip()
+
+    desde, hasta = _rango_mes(anio, mes)
+    ingresos = _ingresos_periodo(desde, hasta)
+    egresos_total = _egresos_periodo(desde, hasta)
+    egresos_categorias = _egresos_por_categoria_periodo(desde, hasta)
+    cierres_curso = _cierres_curso_periodo(desde, hasta)
+    balance = ingresos['total'] - egresos_total
+
+    # Serializar el desglose de egresos por categoría
+    egresos_detalle = [
+        {
+            'categoria': e['nombre'],
+            'total': float(e['total']),
+            'color': e.get('color', ''),
+            'icono': e.get('icono', ''),
+        }
+        for e in egresos_categorias
+    ]
+
+    # Si ya existe un cierre para este mes, lo actualizamos (re-corte)
+    cierre, _creado = CierreAdministrativo.objects.update_or_create(
+        anio=anio, mes=mes,
+        defaults={
+            'etiqueta': etiqueta,
+            'fecha_desde': desde,
+            'fecha_hasta': hasta,
+            'ingreso_abonos': ingresos['abonos'],
+            'ingreso_abonos_archivados': ingresos['abonos_archivados'],
+            'ingreso_ventas': ingresos['ventas'],
+            'ingreso_adicionales': ingresos['adicionales'],
+            'ingreso_total': ingresos['total'],
+            'egreso_total': egresos_total,
+            'egresos_detalle_json': json.dumps(egresos_detalle),
+            'balance_neto': balance,
+            'cierres_curso_incluidos': cierres_curso['count'],
+            'monto_cierres_curso': cierres_curso['total_cobrado'],
+            'observaciones': observaciones,
+            'cerrado_por': request.user if request.user.is_authenticated else None,
+        }
+    )
+
+    messages.success(
+        request,
+        f'✅ Cierre administrativo de {MESES_ES[mes]} {anio} guardado. '
+        f'Ingresos ${ingresos["total"]:.2f} − Egresos ${egresos_total:.2f} = '
+        f'Balance ${balance:.2f}.'
+    )
+    return redirect('academia:cierre_admin_detalle', pk=cierre.pk)
+
+
+@admin_requerido
+def cierre_admin_historial(request):
+    """Lista todos los cierres administrativos (cortes de caja)."""
+    qs = CierreAdministrativo.objects.all()
+
+    anio = request.GET.get('anio', '').strip()
+    mes = request.GET.get('mes', '').strip()
+    if anio.isdigit():
+        qs = qs.filter(anio=int(anio))
+    if mes.isdigit() and 1 <= int(mes) <= 12:
+        # Filtramos por el campo `mes` del propio cierre cuando existe;
+        # si el cierre es anual (mes=NULL), se descarta del filtrado por mes.
+        qs = qs.filter(mes=int(mes))
+
+    cierres = list(qs)
+    total_ingresos = sum((c.ingreso_total for c in cierres), Decimal('0.00'))
+    total_egresos = sum((c.egreso_total for c in cierres), Decimal('0.00'))
+    total_balance = sum((c.balance_neto for c in cierres), Decimal('0.00'))
+
+    anios = sorted(
+        set(CierreAdministrativo.objects.values_list('anio', flat=True)),
+        reverse=True
+    )
+
+    return render(request, 'admin_panel/cierre_admin_historial.html', {
+        'cierres': cierres,
+        'total_ingresos': total_ingresos,
+        'total_egresos': total_egresos,
+        'total_balance': total_balance,
+        'anios': anios,
+        'filtro_anio': anio,
+        'filtro_mes': mes,
+    })
+
+
+@admin_requerido
+def cierre_admin_detalle(request, pk):
+    """Detalle de un cierre administrativo congelado."""
+    cierre = get_object_or_404(CierreAdministrativo, pk=pk)
+
+    egresos_detalle = []
+    if cierre.egresos_detalle_json:
+        try:
+            egresos_detalle = json.loads(cierre.egresos_detalle_json)
+        except (ValueError, TypeError):
+            egresos_detalle = []
+
+    # Cierres de curso que cayeron en el mismo periodo (informativo)
+    cierres_curso = _cierres_curso_periodo(cierre.fecha_desde, cierre.fecha_hasta)
+
+    return render(request, 'admin_panel/cierre_admin_detalle.html', {
+        'cierre': cierre,
+        'egresos_detalle': egresos_detalle,
+        'cierres_curso': cierres_curso,
+    })
+
+
+@admin_requerido
+@require_POST
+def cierre_admin_eliminar(request, pk):
+    """Elimina un cierre administrativo."""
+    cierre = get_object_or_404(CierreAdministrativo, pk=pk)
+    nombre = cierre.encabezado
+    cierre.delete()
+    messages.success(request, f'Cierre administrativo eliminado: {nombre}.')
+    return redirect('academia:cierre_admin_historial')

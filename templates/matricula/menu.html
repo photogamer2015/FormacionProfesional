@@ -26,12 +26,30 @@
     </a>
 
     <a href="{% url 'academia:matricula_lista' modalidad=modalidad %}" style="text-decoration:none;">
-        <div class="card-box" style="border-left: 4px solid #1a237e; cursor:pointer;">
+        <div class="card-box" style="border-left: 4px solid #2e7d32; cursor:pointer;">
             <div style="font-size:32px; margin-bottom:8px;">≡</div>
             <h3 style="color:#1a237e; font-size:17px; margin-bottom:6px;">Lista de Matriculados</h3>
             <p style="color:#666; font-size:13px;">
                 Ver todos los estudiantes matriculados con sus
                 datos, cursos, valores y saldos.
+            </p>
+        </div>
+    </a>
+    <a href="{% url 'academia:estudiantes_lista' %}" style="text-decoration:none">
+        <div class="card-box" style="border-left: 4px solid #1a237e; cursor:pointer;">
+            <div style="font-size:32px; margin-bottom:8px;"> 👥</div>
+            <h3 style="color:#1a237e; font-size:17px; margin-bottom:6px;">Estudiantes</h3>
+            <p style="color:#666; font-size:13px;">
+                Directorio completo con historial y exportación Excel.
+            </p>
+        </div>
+    </a>
+    <a href="{% url 'academia:estudiantes_archivados_lista' %}" style="text-decoration:none">
+        <div class="card-box" style="border-left: 4px solid #1a237e; cursor:pointer;">
+            <div style="font-size:32px; margin-bottom:8px;">🧑‍🎓</div>
+            <h3 style="color:#1a237e; font-size:17px; margin-bottom:6px;">Estudiantes archivados</h3>
+            <p style="color:#666; font-size:13px;">
+                Estudiantes movidos al histórico tras los cierres totales. Consultable y exportable.
             </p>
         </div>
     </a>

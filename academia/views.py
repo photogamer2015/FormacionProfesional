@@ -14,7 +14,7 @@ from .forms import (
     CategoriaForm, CursoForm, EstudianteForm,
     JornadaCursoForm, MatriculaForm,
 )
-from .models import Categoria, Curso, Estudiante, JornadaCurso, Matricula, AssistantQueryLog
+from .models import Categoria, Curso, Estudiante, JornadaCurso, Matricula, AssistantQueryLog, Sede, EstudianteArchivado, MatriculaArchivada
 from .permisos import admin_requerido, matricula_requerida
 
 
@@ -621,12 +621,15 @@ def curso_jornadas(request, pk):
     jornadas_pres = curso.jornadas.filter(modalidad='presencial').order_by('fecha_inicio')
     jornadas_onl = curso.jornadas.filter(modalidad='online').order_by('fecha_inicio')
 
+    sedes = Sede.objects.filter(activa=True).order_by('pais', 'orden', 'nombre')
+
     return render(request, 'cursos/jornadas.html', {
         'curso': curso,
         'jornadas_presencial': jornadas_pres,
         'jornadas_online': jornadas_onl,
         'form': form,
         'modalidad_activa': modalidad_activa,
+        'sedes': sedes,
     })
 
 
@@ -661,9 +664,11 @@ def jornada_editar(request, pk, jornada_pk):
                 'id': jornada.pk,
                 'modalidad': jornada.modalidad,
                 'descripcion': jornada.descripcion,
+                'descripcion_otros': jornada.descripcion_otros or '',
                 'fecha_inicio': jornada.fecha_inicio.strftime('%Y-%m-%d') if jornada.fecha_inicio else '',
                 'hora_inicio': jornada.hora_inicio.strftime('%H:%M') if jornada.hora_inicio else '',
                 'hora_fin': jornada.hora_fin.strftime('%H:%M') if jornada.hora_fin else '',
+                'sede': jornada.sede_id or '',
                 'ciudad': jornada.ciudad or '',
                 'activo': jornada.activo,
             }
@@ -766,6 +771,58 @@ def api_estudiante_por_cedula(request, cedula):
 
     estudiante = Estudiante.objects.filter(cedula=cedula).first()
     if not estudiante:
+        # No está en el directorio vivo. Buscar en el archivo histórico:
+        # si el estudiante fue archivado en un cierre con "limpiar directorio",
+        # recuperamos sus datos personales para autocompletar igual y no
+        # obligar a teclear todo de nuevo. Al guardar la matrícula, el sistema
+        # lo vuelve a crear como estudiante vivo automáticamente.
+        archivado = (
+            EstudianteArchivado.objects
+            .filter(cedula=cedula)
+            .order_by('-archivado_en')
+            .first()
+        )
+        if not archivado:
+            archivado = (
+                MatriculaArchivada.objects
+                .filter(cedula=cedula)
+                .order_by('-archivado_en')
+                .first()
+            )
+
+        if archivado:
+            # El nivel_formacion en el archivo está guardado como texto legible
+            # (ej. "Técnico"); el <select> del formulario espera el código
+            # interno (ej. "tecnico"). Hacemos el mapeo inverso.
+            nivel_codigo = ''
+            nivel_legible = (archivado.nivel_formacion or '').strip()
+            if nivel_legible:
+                for codigo, label in Estudiante.NIVELES_FORMACION:
+                    if label == nivel_legible or codigo == nivel_legible:
+                        nivel_codigo = codigo
+                        break
+
+            ciudad_est = getattr(archivado, 'ciudad', getattr(archivado, 'ciudad_estudiante', ''))
+            titulo_prof = getattr(archivado, 'titulo_profesional', '')
+
+            return JsonResponse({
+                'ok': True,
+                'encontrado': True,
+                'desde_archivo': True,
+                'estudiante': {
+                    'id': '',  # no tiene id vivo todavía; se creará al matricular
+                    'cedula': archivado.cedula,
+                    'apellidos': archivado.apellidos,
+                    'nombres': archivado.nombres,
+                    'edad': archivado.edad if archivado.edad is not None else '',
+                    'correo': archivado.correo or '',
+                    'celular': archivado.celular or '',
+                    'nivel_formacion': nivel_codigo,
+                    'titulo_profesional': titulo_prof,
+                    'ciudad': ciudad_est,
+                },
+                'matriculas': [],  # las matrículas viejas están archivadas, no vivas
+            })
         return JsonResponse({'ok': True, 'encontrado': False})
 
     # Incluir matrículas existentes para detectar duplicados en el frontend
@@ -778,6 +835,7 @@ def api_estudiante_por_cedula(request, cedula):
     return JsonResponse({
         'ok': True,
         'encontrado': True,
+        'desde_archivo': False,
         'estudiante': {
             'id': estudiante.id,
             'cedula': estudiante.cedula,

@@ -440,22 +440,6 @@
     </a>
     {% endif %}
 
-    {% if puede_gestionar_matriculas %}
-    <a href="{% url 'academia:estudiantes_lista' %}" class="card-box">
-        <div class="card-header">
-            <div class="card-title">Estudiantes</div>
-            <div class="card-icon">👥</div>
-        </div>
-        <div class="card-desc">
-            Directorio completo con historial y exportación Excel.
-        </div>
-        <div class="card-footer">
-            <span class="status-ok">Disponible</span>
-            <span>Ingresar →</span>
-        </div>
-    </a>
-    {% endif %}
-
     <a href="{% url 'academia:cursos_lista' modalidad='presencial' %}" class="card-box">
         <div class="card-header">
             <div class="card-title">Cursos Disponibles</div>
@@ -497,6 +481,20 @@
         </div>
         <div class="card-desc">
             Matrículas organizadas por año y mes.
+        </div>
+        <div class="card-footer">
+            <span class="status-ok">Disponible</span>
+            <span>Ingresar →</span>
+        </div>
+    </a>
+
+    <a href="{% url 'academia:archivo_index' %}" class="card-box">
+        <div class="card-header">
+            <div class="card-title">Archivo</div>
+            <div class="card-icon">🗄️</div>
+        </div>
+        <div class="card-desc">
+            Todo lo archivado en carpetas: cursos cerrados, estudiantes archivados y cortes de caja. Organizado para no mezclar nada.
         </div>
         <div class="card-footer">
             <span class="status-ok">Disponible</span>

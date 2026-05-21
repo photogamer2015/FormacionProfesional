@@ -19,6 +19,7 @@ JORNADA_DIAS = [
     ('mar_jue', 'Martes y Jueves'),
     ('sabados_intensivos', 'Sábados Intensivos'),
     ('domingos_intensivos', 'Domingos Intensivos'),
+    ('otros', 'Otros (especificar)'),
 ]
 
 # Tipos de matrícula contratada por el estudiante
@@ -47,6 +48,70 @@ SI_NO = [
     ('si', 'Sí'),
     ('no', 'No'),
 ]
+
+
+# ─────────────────────────────────────────────────────────
+# Sede / Campus (administrable por admin, sin tocar código)
+# ─────────────────────────────────────────────────────────
+
+class Sede(models.Model):
+    """
+    Campus o sede física donde se dictan las jornadas presenciales.
+
+    El administrador puede crear/editar/desactivar sedes desde el panel
+    sin tocar el código. Esto permite que el software escale a nuevos
+    países o ciudades (ej. Caracas, Venezuela) de forma autónoma.
+
+    Las sedes se agrupan por país para mantener todo organizado cuando
+    se opera en varios países a la vez.
+    """
+    nombre = models.CharField(
+        max_length=100,
+        help_text='Nombre de la sede o ciudad (ej. Guayaquil, Quito, Caracas).'
+    )
+    pais = models.CharField(
+        max_length=80, default='Ecuador',
+        help_text='País donde está la sede (ej. Ecuador, Venezuela).'
+    )
+    direccion = models.CharField(
+        max_length=200, blank=True,
+        help_text='Dirección física de la sede (opcional).'
+    )
+    telefono = models.CharField(
+        max_length=40, blank=True,
+        help_text='Teléfono de contacto de la sede (opcional).'
+    )
+    orden = models.PositiveIntegerField(
+        default=0,
+        help_text='Orden de aparición en los listados (menor primero).'
+    )
+    activa = models.BooleanField(
+        default=True,
+        help_text='Si está desactivada, no aparece para elegir en jornadas nuevas, '
+                  'pero las jornadas existentes que ya la usan se conservan.'
+    )
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Sede / Campus'
+        verbose_name_plural = 'Sedes / Campus'
+        ordering = ['pais', 'orden', 'nombre']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['nombre', 'pais'],
+                name='sede_unica_nombre_pais',
+            )
+        ]
+
+    @property
+    def etiqueta(self):
+        """Nombre legible para mostrar (ej. 'Guayaquil · Ecuador')."""
+        if self.pais and self.pais.strip().lower() != 'ecuador':
+            return f'{self.nombre} · {self.pais}'
+        return self.nombre
+
+    def __str__(self):
+        return self.etiqueta
 
 
 class Categoria(models.Model):
@@ -213,12 +278,21 @@ class JornadaCurso(models.Model):
         max_length=200, choices=JORNADA_DIAS,
         help_text='Días en que se dicta la jornada.'
     )
+    descripcion_otros = models.CharField(
+        max_length=120, blank=True,
+        help_text='Días personalizados (solo se usa cuando la descripción es "Otros").'
+    )
     fecha_inicio = models.DateField()
     hora_inicio = models.TimeField(null=True, blank=True)
     hora_fin = models.TimeField(null=True, blank=True)
+    sede = models.ForeignKey(
+        'Sede', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='jornadas',
+        help_text='Sede/campus donde se dicta (presencial). Reemplaza al texto libre de ciudad.'
+    )
     ciudad = models.CharField(
         max_length=100, blank=True,
-        help_text='Ciudad (presencial) o plataforma (online). Opcional.'
+        help_text='Ciudad (presencial) o plataforma (online). Se mantiene sincronizada con la sede.'
     )
     activo = models.BooleanField(default=True)
 
@@ -229,7 +303,10 @@ class JornadaCurso(models.Model):
 
     @property
     def descripcion_legible(self):
-        """Devuelve el label del choice (Lun, Mié, Vie. etc.) o el valor crudo si es legado."""
+        """Devuelve el label del choice (Lun, Mié, Vie. etc.), el texto
+        personalizado si es 'Otros', o el valor crudo si es legado."""
+        if self.descripcion == 'otros':
+            return self.descripcion_otros.strip() or 'Otros días'
         # get_descripcion_display() devuelve el label si está en choices,
         # o el valor crudo si quedó algún registro legado fuera de los choices.
         return self.get_descripcion_display()
@@ -247,6 +324,21 @@ class JornadaCurso(models.Model):
         if self.ciudad:
             partes.append(f'({self.ciudad})')
         return ' – '.join(partes)
+
+    @property
+    def sede_nombre(self):
+        """Nombre de la sede para mostrar: usa la FK si existe, si no el texto ciudad."""
+        if self.sede_id:
+            return self.sede.nombre
+        return self.ciudad or ''
+
+    def save(self, *args, **kwargs):
+        # Mantener el campo de texto `ciudad` sincronizado con la sede elegida,
+        # para que toda la lógica existente que filtra/muestra por `ciudad`
+        # (exports, control por módulo, archivado, etc.) siga funcionando.
+        if self.sede_id:
+            self.ciudad = self.sede.nombre
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.etiqueta
@@ -543,9 +635,18 @@ class Matricula(models.Model):
                 fecha_ultimo[n] = a.fecha
 
         desglose = []
+        # Si el estudiante ya canceló TODO el curso (saldo total <= 0), todos
+        # los módulos se muestran como "Pagado", sin importar cómo se haya
+        # distribuido el dinero entre módulos (pago único, abono libre, etc.).
+        # Esto evita el caso confuso de pagar todo en un módulo y que el resto
+        # siga apareciendo como "Pendiente".
+        curso_pagado_total = self.saldo <= 0 and self.estado != 'retiro_voluntario'
+
         for n in range(1, n_mod + 1):
             pagado = aplicado[n]
-            if pagado >= valor_modulo and valor_modulo > 0:
+            if curso_pagado_total:
+                estado = 'Pagado'
+            elif pagado >= valor_modulo and valor_modulo > 0:
                 estado = 'Pagado'
             elif pagado > 0:
                 estado = 'Parcial'
@@ -570,7 +671,11 @@ class Matricula(models.Model):
             pagos_efectivos = self.pagos_por_modulo_efectivo()
         pagado = pagos_efectivos.get(numero_modulo, Decimal('0.00'))
 
-        if pagado >= valor_modulo and valor_modulo > 0:
+        # Si el curso está totalmente pagado (saldo <= 0), cualquier módulo
+        # se considera "Pagado" — coherente con desglose_pagos_por_modulo().
+        if self.saldo <= 0 and self.estado != 'retiro_voluntario':
+            estado = 'Pagado'
+        elif pagado >= valor_modulo and valor_modulo > 0:
             estado = 'Pagado'
         elif pagado > 0:
             estado = 'Parcial'
@@ -1338,3 +1443,429 @@ class Adicional(models.Model):
 
     def __str__(self):
         return f'{self.get_tipo_adicional_display()} — {self.persona_nombre} (${self.valor})'
+
+
+# ─────────────────────────────────────────────────────────
+# Cierre de Curso — Historial archivado por ciclo
+# ─────────────────────────────────────────────────────────
+#
+# Cuando un curso/jornada termina su ciclo (un mes, un trimestre, lo que el
+# Gerente de Proyectos defina), se ejecuta un "Cierre de curso":
+#   1. Se crea un CierreCurso (cabecera con totales y metadatos).
+#   2. Se copian TODAS las matrículas y abonos asociados a `MatriculaArchivada`
+#      y `AbonoArchivado` (snapshot completo, congelado para siempre).
+#   3. Se borran las matrículas y abonos vivos para que la operación arranque
+#      limpia el siguiente ciclo.
+#
+# Importante: el snapshot es **denormalizado**. Aunque guardamos FKs débiles
+# (curso, jornada, estudiante) con on_delete=SET_NULL, también copiamos los
+# textos legibles (nombre del curso, descripción de jornada, sede, etc.).
+# Si más adelante se borra un curso o un estudiante, el historial sigue siendo
+# legible al 100 %.
+
+class CierreCurso(models.Model):
+    """Cabecera de un cierre de curso/jornada. Es el registro padre del archivo."""
+
+    ALCANCE = [
+        ('jornada', 'Una jornada específica'),
+        ('curso', 'Todo el curso (todas las jornadas)'),
+        ('global', 'Cierre global (todos los cursos)'),
+    ]
+
+    # ── Identidad del cierre ──
+    curso = models.ForeignKey(
+        Curso, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='cierres',
+        help_text='Curso al que pertenece el cierre. Puede quedar nulo si el curso se elimina luego.'
+    )
+    curso_nombre = models.CharField(
+        max_length=150,
+        help_text='Nombre del curso al momento del cierre (denormalizado).'
+    )
+    curso_categoria = models.CharField(
+        max_length=80, blank=True,
+        help_text='Nombre de la categoría del curso al momento del cierre.'
+    )
+    jornada = models.ForeignKey(
+        JornadaCurso, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='cierres',
+        help_text='Jornada cerrada (si el alcance es "jornada"). Nulo para cierre de curso entero.'
+    )
+    jornada_descripcion = models.CharField(
+        max_length=250, blank=True,
+        help_text='Descripción legible de la jornada al momento del cierre.'
+    )
+    jornada_modalidad = models.CharField(
+        max_length=20, choices=MODALIDADES, blank=True,
+        help_text='Modalidad de la jornada cerrada.'
+    )
+    jornada_fecha_inicio = models.DateField(null=True, blank=True)
+    jornada_sede = models.CharField(max_length=100, blank=True)
+
+    alcance = models.CharField(
+        max_length=20, choices=ALCANCE, default='jornada'
+    )
+
+    # ── Etiqueta libre del ciclo (ej. "Mayo 2026", "Ciclo 2025-Q4") ──
+    ciclo_etiqueta = models.CharField(
+        max_length=80, blank=True,
+        help_text='Etiqueta opcional para identificar el ciclo (ej. "Mayo 2026", "Trimestre I").'
+    )
+    observaciones = models.TextField(blank=True)
+
+    # ── Totales congelados ──
+    total_matriculas = models.PositiveIntegerField(default=0)
+    total_facturado = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'),
+        help_text='Suma de valor_neto (valor_curso - descuento) de todas las matrículas archivadas.'
+    )
+    total_cobrado = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'),
+        help_text='Suma de valor_pagado de todas las matrículas archivadas.'
+    )
+    total_pendiente = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00')
+    )
+    conteo_pagado = models.PositiveIntegerField(default=0)
+    conteo_parcial = models.PositiveIntegerField(default=0)
+    conteo_pendiente = models.PositiveIntegerField(default=0)
+    conteo_retiro = models.PositiveIntegerField(default=0)
+
+    # ── Para cierres globales: la modalidad afectada (presencial/online/todas) ──
+    modalidad_global = models.CharField(
+        max_length=20, blank=True,
+        help_text='Solo para alcance="global": presencial, online o "" (todas las modalidades).'
+    )
+
+    # ── ¿Se limpió también el directorio de estudiantes? ──
+    limpio_directorio = models.BooleanField(
+        default=False,
+        help_text='True si en este cierre se borraron además los estudiantes huérfanos del directorio.'
+    )
+    total_estudiantes_archivados = models.PositiveIntegerField(default=0)
+
+    # ── Auditoría ──
+    fecha_cierre = models.DateTimeField(auto_now_add=True)
+    cerrado_por = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='cierres_realizados',
+        help_text='Usuario administrador que ejecutó el cierre.'
+    )
+
+    class Meta:
+        verbose_name = 'Cierre de Curso'
+        verbose_name_plural = 'Cierres de Curso'
+        ordering = ['-fecha_cierre']
+
+    def __str__(self):
+        if self.jornada_descripcion:
+            return f'{self.curso_nombre} — {self.jornada_descripcion} (cerrado {self.fecha_cierre:%d/%m/%Y})'
+        return f'{self.curso_nombre} (cerrado {self.fecha_cierre:%d/%m/%Y})'
+
+    @property
+    def encabezado(self):
+        partes = [self.curso_nombre]
+        if self.jornada_descripcion:
+            partes.append(self.jornada_descripcion)
+        if self.ciclo_etiqueta:
+            partes.append(f'[{self.ciclo_etiqueta}]')
+        return ' · '.join(partes)
+
+
+class MatriculaArchivada(models.Model):
+    """
+    Snapshot completo de una matrícula al momento del cierre.
+    Todos los campos visibles de la lista de matrículas viven aquí
+    como datos planos (denormalizados) para que el historial sea legible
+    siempre, aunque luego se borren cursos o estudiantes.
+    """
+
+    cierre = models.ForeignKey(
+        CierreCurso, on_delete=models.CASCADE, related_name='matriculas_archivadas'
+    )
+
+    # ── FK débiles (pueden quedar nulas si se eliminan los originales) ──
+    matricula_original_id = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='ID de la matrícula original antes del cierre (auditoría).'
+    )
+    estudiante = models.ForeignKey(
+        Estudiante, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='matriculas_archivadas'
+    )
+    curso = models.ForeignKey(
+        Curso, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='matriculas_archivadas'
+    )
+    jornada = models.ForeignKey(
+        JornadaCurso, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='matriculas_archivadas'
+    )
+
+    # ── Datos del estudiante (denormalizados) ──
+    cedula = models.CharField(max_length=20)
+    apellidos = models.CharField(max_length=120)
+    nombres = models.CharField(max_length=120)
+    edad = models.CharField(max_length=10, blank=True)
+    correo = models.EmailField(blank=True)
+    celular = models.CharField(max_length=30, blank=True)
+    ciudad_estudiante = models.CharField(max_length=80, blank=True)
+    nivel_formacion = models.CharField(max_length=30, blank=True)
+    talla_camiseta = models.CharField(max_length=4, blank=True)
+
+    # ── Datos del curso/jornada (denormalizados) ──
+    curso_nombre = models.CharField(max_length=150)
+    curso_categoria = models.CharField(max_length=80, blank=True)
+    jornada_descripcion = models.CharField(max_length=250, blank=True)
+    jornada_fecha_inicio = models.DateField(null=True, blank=True)
+    jornada_horario = models.CharField(max_length=50, blank=True)
+    sede = models.CharField(max_length=100, blank=True)
+
+    # ── Datos de la matrícula ──
+    modalidad = models.CharField(max_length=20, choices=MODALIDADES)
+    tipo_matricula = models.CharField(max_length=30, blank=True)
+    estado = models.CharField(max_length=30, blank=True)
+    fecha_matricula = models.DateField()
+    valor_curso = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    descuento = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    valor_neto = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    valor_pagado = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    saldo = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    estado_pago = models.CharField(
+        max_length=20,
+        help_text='Pagado / Parcial / Pendiente / Retiro (congelado al cierre).'
+    )
+
+    # ── Datos del comprobante ──
+    tipo_registro = models.CharField(max_length=30, blank=True)
+    factura_realizada = models.CharField(max_length=2, blank=True)
+    fact_nombres = models.CharField(max_length=120, blank=True)
+    fact_apellidos = models.CharField(max_length=120, blank=True)
+    fact_cedula = models.CharField(max_length=20, blank=True)
+    fact_correo = models.EmailField(blank=True)
+    link_comprobante = models.URLField(max_length=500, blank=True)
+
+    observaciones = models.TextField(blank=True)
+
+    # ── Auditoría ──
+    registrado_por_nombre = models.CharField(
+        max_length=120, blank=True,
+        help_text='Nombre del asesor que registró la matrícula originalmente.'
+    )
+    creado_original = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Fecha en que se creó la matrícula original.'
+    )
+    archivado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Matrícula archivada'
+        verbose_name_plural = 'Matrículas archivadas'
+        ordering = ['cierre', 'apellidos', 'nombres']
+        indexes = [
+            models.Index(fields=['cierre', 'estado_pago']),
+            models.Index(fields=['cierre', 'modalidad']),
+            models.Index(fields=['cedula']),
+        ]
+
+    @property
+    def nombre_completo(self):
+        return f'{self.apellidos} {self.nombres}'.strip()
+
+    def __str__(self):
+        return f'{self.nombre_completo} — {self.curso_nombre} (archivado)'
+
+
+class AbonoArchivado(models.Model):
+    """Snapshot completo de un abono al momento del cierre."""
+
+    matricula_archivada = models.ForeignKey(
+        MatriculaArchivada, on_delete=models.CASCADE, related_name='abonos_archivados'
+    )
+    cierre = models.ForeignKey(
+        CierreCurso, on_delete=models.CASCADE, related_name='abonos_archivados'
+    )
+
+    # ── Datos del abono ──
+    abono_original_id = models.PositiveIntegerField(null=True, blank=True)
+    fecha = models.DateField()
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    tipo_pago = models.CharField(max_length=20, blank=True)
+    tipo_pago_label = models.CharField(max_length=40, blank=True)
+    numero_modulo = models.PositiveIntegerField(null=True, blank=True)
+    cuenta_para_saldo = models.BooleanField(default=True)
+    metodo = models.CharField(max_length=20, blank=True)
+    metodo_label = models.CharField(max_length=40, blank=True)
+    banco = models.CharField(max_length=30, blank=True)
+    banco_label = models.CharField(max_length=40, blank=True)
+    numero_recibo = models.CharField(max_length=30, blank=True)
+    observaciones = models.TextField(blank=True)
+
+    registrado_por_nombre = models.CharField(max_length=120, blank=True)
+    creado_original = models.DateTimeField(null=True, blank=True)
+    archivado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Abono archivado'
+        verbose_name_plural = 'Abonos archivados'
+        ordering = ['matricula_archivada', '-fecha']
+
+    def __str__(self):
+        return f'{self.numero_recibo or "—"} — ${self.monto} ({self.fecha})'
+
+
+# ─────────────────────────────────────────────────────────
+# Estudiante Archivado (directorio histórico)
+# ─────────────────────────────────────────────────────────
+#
+# Al ejecutar un cierre con la opción "Limpiar directorio de estudiantes",
+# los estudiantes cuyas matrículas se archivaron en ese cierre Y que NO
+# tengan otras matrículas vivas en otros cursos, se copian aquí y se borran
+# del directorio activo. El registro queda permanentemente consultable.
+
+class EstudianteArchivado(models.Model):
+    """Snapshot del estudiante (datos personales) al momento del cierre."""
+
+    cierre = models.ForeignKey(
+        CierreCurso, on_delete=models.CASCADE, related_name='estudiantes_archivados'
+    )
+    estudiante_original_id = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='ID del estudiante original (referencia auditiva).'
+    )
+
+    cedula = models.CharField(max_length=20)
+    apellidos = models.CharField(max_length=100)
+    nombres = models.CharField(max_length=100)
+    edad = models.PositiveIntegerField(null=True, blank=True)
+    correo = models.EmailField(blank=True)
+    celular = models.CharField(max_length=20, blank=True)
+    nivel_formacion = models.CharField(max_length=80, blank=True)
+    titulo_profesional = models.CharField(max_length=200, blank=True)
+    ciudad = models.CharField(max_length=100, blank=True)
+
+    creado_original = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Fecha en que se registró originalmente el estudiante.'
+    )
+    archivado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Estudiante archivado'
+        verbose_name_plural = 'Estudiantes archivados'
+        ordering = ['-archivado_en', 'apellidos', 'nombres']
+        indexes = [
+            models.Index(fields=['cedula']),
+            models.Index(fields=['cierre']),
+        ]
+
+    @property
+    def nombre_completo(self):
+        return f'{self.apellidos} {self.nombres}'.strip()
+
+    def __str__(self):
+        return f'{self.cedula} — {self.nombre_completo} (archivado)'
+
+# ─────────────────────────────────────────────────────────
+# Cierre Administrativo (cierre financiero del periodo)
+# ─────────────────────────────────────────────────────────
+#
+# A diferencia del CierreCurso (que archiva matrículas), el CierreAdministrativo
+# congela el ESTADO FINANCIERO de un periodo (normalmente un mes):
+#   - Ingresos del periodo (abonos vivos + abonos archivados de cierres de curso
+#     + ventas manuales + adicionales).
+#   - Egresos del periodo.
+#   - Balance neto.
+#
+# Es un snapshot contable. No borra nada (los egresos se conservan), solo
+# fotografía los totales para tener un "corte de caja" oficial del mes que ya
+# no cambia aunque después se hagan cierres de curso o se editen registros.
+
+class CierreAdministrativo(models.Model):
+    """Corte de caja / cierre financiero de un periodo (mes)."""
+
+    # ── Periodo cubierto ──
+    anio = models.PositiveIntegerField()
+    mes = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Mes (1-12). Si es nulo, el cierre cubre todo el año.'
+    )
+    etiqueta = models.CharField(
+        max_length=80, blank=True,
+        help_text='Etiqueta libre (ej. "Corte Mayo 2026").'
+    )
+    fecha_desde = models.DateField()
+    fecha_hasta = models.DateField()
+
+    # ── Ingresos congelados (desglose) ──
+    ingreso_abonos = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'),
+        help_text='Abonos vivos del periodo.'
+    )
+    ingreso_abonos_archivados = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'),
+        help_text='Abonos de cursos cerrados (archivados) del periodo.'
+    )
+    ingreso_ventas = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'),
+        help_text='Ventas/comprobantes manuales del periodo.'
+    )
+    ingreso_adicionales = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'),
+        help_text='Adicionales (certificados, supletorios, camisas) del periodo.'
+    )
+    ingreso_total = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00')
+    )
+
+    # ── Egresos congelados ──
+    egreso_total = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00')
+    )
+    egresos_detalle_json = models.TextField(
+        blank=True,
+        help_text='JSON con el desglose de egresos por categoría al momento del cierre.'
+    )
+
+    # ── Balance ──
+    balance_neto = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'),
+        help_text='ingreso_total - egreso_total.'
+    )
+
+    # ── Referencias a cierres de curso incluidos en este periodo ──
+    cierres_curso_incluidos = models.PositiveIntegerField(
+        default=0,
+        help_text='Cuántos cierres de curso cayeron dentro de este periodo.'
+    )
+    monto_cierres_curso = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'),
+        help_text='Total cobrado en los cierres de curso de este periodo.'
+    )
+
+    observaciones = models.TextField(blank=True)
+
+    # ── Auditoría ──
+    fecha_cierre = models.DateTimeField(auto_now_add=True)
+    cerrado_por = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='cierres_admin_realizados'
+    )
+
+    class Meta:
+        verbose_name = 'Cierre administrativo'
+        verbose_name_plural = 'Cierres administrativos'
+        ordering = ['-anio', '-mes', '-fecha_cierre']
+
+    def __str__(self):
+        return f'{self.encabezado} — balance ${self.balance_neto}'
+
+    @property
+    def encabezado(self):
+        if self.etiqueta:
+            return self.etiqueta
+        meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+        if self.mes:
+            return f'Corte {meses[self.mes]} {self.anio}'
+        return f'Corte anual {self.anio}'

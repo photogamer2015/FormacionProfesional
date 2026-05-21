@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+
+{% block title %}Cortes de caja{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:archivo_index' %}">Archivo</a> &nbsp;›&nbsp;
+    📁 Administrativo &nbsp;›&nbsp;
+    Cortes de caja
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:8px;">
+    <div>
+        <h2 class="page-title">🧾 Cortes de caja administrativos</h2>
+        <p class="page-subtitle">Cierres financieros mensuales congelados. Total: {{ cierres|length }} corte{{ cierres|length|pluralize }}.</p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="{% url 'academia:archivo_index' %}" class="btn btn-secondary">‹ Volver al archivo</a>
+        <a href="{% url 'academia:cierre_admin_preview' %}" class="btn" style="background:#1a237e; color:white; font-weight:700;">
+            🧾 Nuevo corte
+        </a>
+    </div>
+</div>
+
+{# Totales agregados #}
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin:18px 0;">
+    <div class="card-box" style="background:#e8f5e9; border-left:4px solid #2e7d32;">
+        <div style="font-size:11px; color:#555; text-transform:uppercase;">Ingresos acumulados</div>
+        <div style="font-size:22px; font-weight:700; color:#2e7d32;">${{ total_ingresos|floatformat:2 }}</div>
+    </div>
+    <div class="card-box" style="background:#ffebee; border-left:4px solid #c62828;">
+        <div style="font-size:11px; color:#555; text-transform:uppercase;">Egresos acumulados</div>
+        <div style="font-size:22px; font-weight:700; color:#c62828;">${{ total_egresos|floatformat:2 }}</div>
+    </div>
+    <div class="card-box" style="background:#e8eaf6; border-left:4px solid #1a237e;">
+        <div style="font-size:11px; color:#555; text-transform:uppercase;">Balance acumulado</div>
+        <div style="font-size:22px; font-weight:700; color:{% if total_balance >= 0 %}#1a237e{% else %}#c62828{% endif %};">
+            {% if total_balance >= 0 %}+{% endif %}${{ total_balance|floatformat:2 }}
+        </div>
+    </div>
+</div>
+
+{# Filtro por año #}
+{% if anios %}
+<div class="card-box" style="margin-bottom:18px; padding:14px;">
+    <form method="get" style="display:flex; gap:10px; align-items:end;">
+        <div>
+            <label class="form-label" style="font-size:11px;">Año</label>
+            <select name="anio" class="form-input" onchange="this.form.submit()">
+                <option value="">— Todos —</option>
+                {% for a in anios %}
+                <option value="{{ a }}" {% if filtro_anio == a|stringformat:"s" %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+{# Tabla #}
+<div class="table-wrap">
+    {% if cierres %}
+    <table>
+        <thead>
+            <tr>
+                <th>Periodo</th>
+                <th>Cerrado el</th>
+                <th>Ingresos</th>
+                <th>de cursos cerrados</th>
+                <th>Egresos</th>
+                <th>Balance neto</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in cierres %}
+            <tr>
+                <td><strong>{{ c.encabezado }}</strong></td>
+                <td style="font-size:12px; color:#666;">{{ c.fecha_cierre|date:"d/m/Y H:i" }}</td>
+                <td><strong style="color:#2e7d32;">${{ c.ingreso_total|floatformat:2 }}</strong></td>
+                <td style="color:#607d8b;">
+                    {% if c.ingreso_abonos_archivados > 0 %}
+                        🗄️ ${{ c.ingreso_abonos_archivados|floatformat:2 }}
+                    {% else %}
+                        <span style="color:#ccc;">—</span>
+                    {% endif %}
+                </td>
+                <td><strong style="color:#c62828;">${{ c.egreso_total|floatformat:2 }}</strong></td>
+                <td>
+                    <strong style="color:{% if c.balance_neto >= 0 %}#2e7d32{% else %}#c62828{% endif %}; font-size:15px;">
+                        {% if c.balance_neto >= 0 %}+{% endif %}${{ c.balance_neto|floatformat:2 }}
+                    </strong>
+                </td>
+                <td>
+                    <a href="{% url 'academia:cierre_admin_detalle' c.pk %}" class="btn btn-primary btn-sm">Ver</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p style="font-size:15px;">No hay cortes de caja todavía.</p>
+        <p style="font-size:13px; color:#aaa;">Genera el primer corte desde el dashboard administrativo.</p>
+        <a href="{% url 'academia:cierre_admin_preview' %}" class="btn btn-primary" style="margin-top:14px;">🧾 Generar corte</a>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

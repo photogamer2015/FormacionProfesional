@@ -2,8 +2,21 @@ from django.contrib import admin
 from .models import (
     Adicional, Categoria, Comprobante, Curso, JornadaCurso,
     Estudiante, Matricula, PersonaExterna, RecuperacionPendiente,
-    AssistantQueryLog,
+    AssistantQueryLog, CierreCurso, MatriculaArchivada, AbonoArchivado,
+    EstudianteArchivado, CierreAdministrativo, Sede,
 )
+
+
+@admin.register(Sede)
+class SedeAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'pais', 'orden', 'activa', 'num_jornadas')
+    list_editable = ('orden', 'activa')
+    list_filter = ('pais', 'activa')
+    search_fields = ('nombre', 'pais')
+
+    def num_jornadas(self, obj):
+        return obj.jornadas.count()
+    num_jornadas.short_description = '# jornadas'
 
 
 @admin.register(Categoria)
@@ -20,7 +33,7 @@ class CategoriaAdmin(admin.ModelAdmin):
 class JornadaCursoInline(admin.TabularInline):
     model = JornadaCurso
     extra = 1
-    fields = ('modalidad', 'descripcion', 'fecha_inicio', 'hora_inicio', 'hora_fin', 'ciudad', 'activo')
+    fields = ('modalidad', 'descripcion', 'descripcion_otros', 'fecha_inicio', 'hora_inicio', 'hora_fin', 'sede', 'activo')
 
 
 @admin.register(Curso)
@@ -56,11 +69,11 @@ class CursoAdmin(admin.ModelAdmin):
 @admin.register(JornadaCurso)
 class JornadaCursoAdmin(admin.ModelAdmin):
     list_display = (
-        'curso', 'modalidad', 'descripcion', 'fecha_inicio',
-        'hora_inicio', 'hora_fin', 'ciudad', 'activo',
+        'curso', 'modalidad', 'descripcion', 'descripcion_otros', 'fecha_inicio',
+        'hora_inicio', 'hora_fin', 'sede', 'ciudad', 'activo',
     )
-    list_filter = ('modalidad', 'activo', 'ciudad', 'curso')
-    search_fields = ('curso__nombre', 'descripcion', 'ciudad')
+    list_filter = ('modalidad', 'activo', 'sede', 'ciudad', 'curso')
+    search_fields = ('curso__nombre', 'descripcion', 'descripcion_otros', 'ciudad')
 
 
 @admin.register(Estudiante)
@@ -226,3 +239,102 @@ class AssistantQueryLogAdmin(admin.ModelAdmin):
     def message_short(self, obj):
         return (obj.message[:80] + '...') if len(obj.message) > 80 else obj.message
     message_short.short_description = 'Mensaje'
+
+# ─────────────────────────────────────────────────────────
+# Cierre de Curso (historial archivado)
+# ─────────────────────────────────────────────────────────
+
+class AbonoArchivadoInline(admin.TabularInline):
+    model = AbonoArchivado
+    extra = 0
+    can_delete = False
+    fields = ('fecha', 'numero_recibo', 'monto', 'tipo_pago_label',
+              'metodo_label', 'banco_label', 'numero_modulo', 'cuenta_para_saldo')
+    readonly_fields = fields
+    verbose_name_plural = 'Abonos archivados (snapshot)'
+
+
+@admin.register(CierreCurso)
+class CierreCursoAdmin(admin.ModelAdmin):
+    list_display = (
+        'fecha_cierre', 'curso_nombre', 'jornada_descripcion',
+        'alcance', 'total_matriculas', 'total_facturado',
+        'total_cobrado', 'cerrado_por',
+    )
+    list_filter = ('alcance', 'jornada_modalidad', 'fecha_cierre', 'cerrado_por')
+    search_fields = ('curso_nombre', 'jornada_descripcion', 'ciclo_etiqueta', 'jornada_sede')
+    readonly_fields = (
+        'fecha_cierre', 'cerrado_por',
+        'total_matriculas', 'total_facturado', 'total_cobrado', 'total_pendiente',
+        'conteo_pagado', 'conteo_parcial', 'conteo_pendiente', 'conteo_retiro',
+    )
+    fieldsets = (
+        ('Identidad', {
+            'fields': ('curso', 'curso_nombre', 'curso_categoria',
+                       'jornada', 'jornada_descripcion', 'jornada_modalidad',
+                       'jornada_fecha_inicio', 'jornada_sede', 'alcance',
+                       'ciclo_etiqueta', 'observaciones'),
+        }),
+        ('Totales (congelados)', {
+            'fields': ('total_matriculas', 'total_facturado', 'total_cobrado', 'total_pendiente',
+                       'conteo_pagado', 'conteo_parcial', 'conteo_pendiente', 'conteo_retiro'),
+        }),
+        ('Auditoría', {
+            'fields': ('fecha_cierre', 'cerrado_por'),
+        }),
+    )
+
+
+@admin.register(MatriculaArchivada)
+class MatriculaArchivadaAdmin(admin.ModelAdmin):
+    list_display = (
+        'cedula', 'apellidos', 'nombres', 'curso_nombre',
+        'jornada_descripcion', 'modalidad', 'valor_neto',
+        'valor_pagado', 'estado_pago', 'cierre',
+    )
+    list_filter = ('estado_pago', 'modalidad', 'cierre__curso_nombre')
+    search_fields = ('cedula', 'apellidos', 'nombres', 'correo', 'celular',
+                     'curso_nombre', 'jornada_descripcion')
+    readonly_fields = [f.name for f in MatriculaArchivada._meta.fields]
+    inlines = [AbonoArchivadoInline]
+    list_select_related = ('cierre',)
+
+
+@admin.register(AbonoArchivado)
+class AbonoArchivadoAdmin(admin.ModelAdmin):
+    list_display = (
+        'fecha', 'numero_recibo', 'monto', 'tipo_pago_label',
+        'metodo_label', 'matricula_archivada', 'cierre',
+    )
+    list_filter = ('tipo_pago', 'metodo', 'fecha')
+    search_fields = (
+        'numero_recibo',
+        'matricula_archivada__cedula',
+        'matricula_archivada__apellidos',
+        'matricula_archivada__curso_nombre',
+    )
+    readonly_fields = [f.name for f in AbonoArchivado._meta.fields]
+    list_select_related = ('matricula_archivada', 'cierre')
+
+
+@admin.register(EstudianteArchivado)
+class EstudianteArchivadoAdmin(admin.ModelAdmin):
+    list_display = (
+        'cedula', 'apellidos', 'nombres', 'correo', 'celular',
+        'ciudad', 'archivado_en', 'cierre',
+    )
+    list_filter = ('archivado_en', 'ciudad')
+    search_fields = ('cedula', 'apellidos', 'nombres', 'correo', 'celular')
+    readonly_fields = [f.name for f in EstudianteArchivado._meta.fields]
+    list_select_related = ('cierre',)
+
+
+@admin.register(CierreAdministrativo)
+class CierreAdministrativoAdmin(admin.ModelAdmin):
+    list_display = (
+        'encabezado', 'anio', 'mes', 'ingreso_total', 'egreso_total',
+        'balance_neto', 'fecha_cierre', 'cerrado_por',
+    )
+    list_filter = ('anio', 'mes', 'fecha_cierre')
+    search_fields = ('etiqueta', 'observaciones')
+    readonly_fields = ('fecha_cierre', 'cerrado_por')

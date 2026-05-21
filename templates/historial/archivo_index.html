@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+
+{% block title %}Archivo{% endblock %}
+
+{% block extra_head %}
+<style>
+    .folder-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 22px;
+        margin-top: 8px;
+    }
+    .folder-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+        overflow: hidden;
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+        display: flex;
+        flex-direction: column;
+    }
+    .folder-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 28px rgba(0,0,0,0.13);
+    }
+    .folder-head {
+        padding: 22px 24px 18px;
+        color: white;
+        position: relative;
+    }
+    .folder-head .tab {
+        position: absolute;
+        top: -1px; left: 24px;
+        width: 70px; height: 10px;
+        background: rgba(255,255,255,0.35);
+        border-radius: 0 0 6px 6px;
+    }
+    .folder-icon { font-size: 40px; line-height: 1; }
+    .folder-title { font-size: 20px; font-weight: 700; margin: 8px 0 4px; }
+    .folder-desc { font-size: 12.5px; opacity: 0.9; line-height: 1.45; }
+    .folder-summary {
+        display: inline-block;
+        background: rgba(255,255,255,0.22);
+        padding: 3px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-top: 12px;
+    }
+    .folder-body { padding: 12px 14px 14px; flex: 1; }
+
+    /* ── Tarjeta de mes (subcarpeta) ── */
+    .month-card {
+        border: 1px solid #e8e8ee;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+        background: #fafbff;
+        transition: background 0.14s ease, border-color 0.14s ease;
+    }
+    .month-card:hover {
+        background: #f0f3ff;
+        border-color: #c9d2ff;
+    }
+    .month-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 6px;
+    }
+    .month-icon { font-size: 22px; }
+    .month-title { font-weight: 700; font-size: 15px; color: #1a237e; }
+    .month-desc { font-size: 12px; color: #666; margin-left: 32px; margin-bottom: 8px; }
+    .month-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-left: 32px;
+    }
+    .month-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 11px;
+        border-radius: 8px;
+        background: white;
+        border: 1px solid #d8defc;
+        text-decoration: none;
+        color: #1a237e;
+        font-size: 12.5px;
+        font-weight: 600;
+        transition: all 0.14s ease;
+    }
+    .month-link:hover {
+        background: #1a237e;
+        color: white;
+        border-color: #1a237e;
+        text-decoration: none;
+    }
+    .month-link.admin { color: #2e7d32; border-color: #c8e6c9; }
+    .month-link.admin:hover { background: #2e7d32; color: white; border-color: #2e7d32; }
+
+    .empty-state {
+        text-align: center;
+        padding: 30px 16px;
+        color: #999;
+        font-size: 13px;
+        font-style: italic;
+    }
+
+    /* ── Dark mode ── */
+    body.dark-mode .folder-card { background: #1e1e1e; border: 1px solid #333; }
+    body.dark-mode .month-card { background: #252525; border-color: #3a3a3a; }
+    body.dark-mode .month-card:hover { background: #2c2c34; border-color: #4a5fcf; }
+    body.dark-mode .month-title { color: #90caf9; }
+    body.dark-mode .month-desc { color: #aaa; }
+    body.dark-mode .month-link {
+        background: #1e1e1e; color: #90caf9; border-color: #3a3a3a;
+    }
+    body.dark-mode .month-link:hover { background: #1a237e; color: white; border-color: #1a237e; }
+    body.dark-mode .month-link.admin { color: #a5d6a7; }
+    body.dark-mode .month-link.admin:hover { background: #2e7d32; color: white; }
+    body.dark-mode .empty-state { color: #777; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp; Archivo
+</div>
+
+<div style="margin-bottom:8px;">
+    <h2 class="page-title">🗄️ Archivo</h2>
+    <p class="page-subtitle">
+        Todo lo archivado, organizado en carpetas <strong>por mes</strong> para que nunca se mezcle.
+        Abre un mes para ver su contenido.
+    </p>
+</div>
+
+<div class="folder-grid">
+    {% for c in carpetas %}
+    <div class="folder-card">
+        <div class="folder-head" style="background:linear-gradient(135deg, {{ c.color }} 0%, {{ c.color }}cc 100%);">
+            <div class="tab"></div>
+            <div class="folder-icon">{{ c.icono }}</div>
+            <div class="folder-title">📁 {{ c.titulo }}</div>
+            <div class="folder-desc">{{ c.descripcion }}</div>
+            <span class="folder-summary">{{ c.resumen }}</span>
+        </div>
+
+        <div class="folder-body">
+            {% if c.meses %}
+                {% for m in c.meses %}
+                <div class="month-card">
+                    <div class="month-header">
+                        <span class="month-icon">📅</span>
+                        <span class="month-title">{{ m.etiqueta }}</span>
+                    </div>
+                    <div class="month-desc">{{ m.descripcion }}</div>
+                    <div class="month-actions">
+                        {% if c.clave == 'estudiantes' %}
+                            {% if m.total_cierres > 0 %}
+                            <a class="month-link"
+                               href="{% url c.url_cursos %}?anio={{ m.anio }}&mes={{ m.mes }}">
+                                📦 Cursos cerrados ({{ m.total_cierres }})
+                            </a>
+                            {% endif %}
+                            {% if m.total_estudiantes_arch > 0 %}
+                            <a class="month-link"
+                               href="{% url c.url_estudiantes %}?anio={{ m.anio }}&mes={{ m.mes }}">
+                                🗂️ Estudiantes archivados ({{ m.total_estudiantes_arch }})
+                            </a>
+                            {% endif %}
+                        {% elif c.clave == 'administrativo' %}
+                            <a class="month-link admin"
+                               href="{% url c.url_admin %}?anio={{ m.anio }}&mes={{ m.mes }}">
+                                🧾 Cortes de caja ({{ m.total_cierres }})
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">{{ c.vacio_msg }}</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<p style="margin-top:22px; font-size:12px; color:#888;">
+    💡 Cada mes es una <strong>subcarpeta independiente</strong>: los registros de mayo nunca se mezclan
+    con los de junio, julio, etc. Así puedes archivar todo el año sin que la lista se vuelva inmanejable.
+</p>
+{% endblock %}

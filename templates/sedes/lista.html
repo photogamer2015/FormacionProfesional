@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block title %}Sedes / Campus{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:admin_dashboard' %}">Dashboard Admin</a> &nbsp;›&nbsp;
+    Sedes / Campus
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:8px;">
+    <div>
+        <h2 class="page-title">🏢 Sedes / Campus</h2>
+        <p class="page-subtitle">
+            Administra las ciudades donde se dictan las jornadas presenciales.
+            Crea nuevas sedes (incluso en otros países) sin tocar el código.
+            Total: {{ total }} sede{{ total|pluralize }} · {{ total_activas }} activa{{ total_activas|pluralize }}.
+        </p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="{% url 'academia:sede_crear' %}" class="btn btn-primary">+ Nueva sede</a>
+    </div>
+</div>
+
+{% for grupo in grupos %}
+<div style="background:white; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); margin-bottom:18px; overflow:hidden;">
+    {# Cabecera del país #}
+    <div style="background:linear-gradient(135deg, #1a237e 0%, #283593 100%); color:white; padding:13px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <h3 style="font-size:16px; font-weight:700; margin:0;">🌎 {{ grupo.pais }}</h3>
+        <span style="background:rgba(255,255,255,0.22); padding:3px 12px; border-radius:12px; font-size:12px; font-weight:600;">
+            {{ grupo.total }} sede{{ grupo.total|pluralize }}
+        </span>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:14px;">
+            <thead>
+                <tr style="background:#f5f5f7; color:#666;">
+                    <th style="padding:10px 16px; text-align:left; font-size:11px; font-weight:600; text-transform:uppercase;">Sede</th>
+                    <th style="padding:10px 16px; text-align:left; font-size:11px; font-weight:600; text-transform:uppercase;">Dirección</th>
+                    <th style="padding:10px 16px; text-align:left; font-size:11px; font-weight:600; text-transform:uppercase;">Teléfono</th>
+                    <th style="padding:10px 16px; text-align:center; font-size:11px; font-weight:600; text-transform:uppercase;">Jornadas</th>
+                    <th style="padding:10px 16px; text-align:center; font-size:11px; font-weight:600; text-transform:uppercase;">Estado</th>
+                    <th style="padding:10px 16px; text-align:right; font-size:11px; font-weight:600; text-transform:uppercase;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in grupo.sedes %}
+                <tr style="border-bottom:1px solid #f5f5f7;">
+                    <td style="padding:11px 16px;"><strong>{{ s.nombre }}</strong></td>
+                    <td style="padding:11px 16px; color:#666; font-size:13px;">{{ s.direccion|default:'—' }}</td>
+                    <td style="padding:11px 16px; color:#666; font-size:13px;">{{ s.telefono|default:'—' }}</td>
+                    <td style="padding:11px 16px; text-align:center;">{{ s.num_jornadas }}</td>
+                    <td style="padding:11px 16px; text-align:center;">
+                        {% if s.activa %}
+                        <span class="badge badge-pagado">Activa</span>
+                        {% else %}
+                        <span class="badge badge-pendiente">Inactiva</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:11px 16px; text-align:right;">
+                        <div class="row-actions" style="display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap;">
+                            <a href="{% url 'academia:sede_editar' s.pk %}" class="btn btn-warning btn-sm">Editar</a>
+
+                            <form method="post" action="{% url 'academia:sede_toggle' s.pk %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-secondary btn-sm">
+                                    {% if s.activa %}Desactivar{% else %}Activar{% endif %}
+                                </button>
+                            </form>
+
+                            <form method="post" action="{% url 'academia:sede_eliminar' s.pk %}"
+                                  onsubmit="return false;" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="button" class="btn btn-danger btn-sm"
+                                    onclick="confirmarAccion(this.closest('form'), '¿Eliminar la sede {{ s.nombre|escapejs }}? Si tiene jornadas, solo se desactivará.', 'danger')">
+                                    Eliminar
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% empty %}
+<div class="empty-state" style="background:white; border-radius:12px; padding:40px;">
+    <p style="font-size:15px;">Aún no hay sedes registradas.</p>
+    <p style="font-size:13px; color:#aaa; margin-top:8px;">
+        Crea tu primera sede para poder asignarla a las jornadas presenciales.
+    </p>
+    <a href="{% url 'academia:sede_crear' %}" class="btn btn-primary" style="margin-top:14px;">+ Crear primera sede</a>
+</div>
+{% endfor %}
+
+<div style="margin-top:14px;">
+    <a href="{% url 'academia:admin_dashboard' %}" class="btn btn-secondary">‹ Volver al dashboard</a>
+</div>
+
+<p style="margin-top:14px; font-size:12px; color:#888;">
+    💡 Las sedes desactivadas no aparecen al crear jornadas nuevas, pero las jornadas que ya las usan se conservan intactas.
+</p>
+{% endblock %}

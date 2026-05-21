@@ -1,0 +1,257 @@
+{% extends 'base.html' %}
+
+{% block title %}Cierre de curso — {{ curso.nombre }}{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:cursos_lista' modalidad='presencial' %}">Cursos</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:curso_jornadas' curso.pk %}">{{ curso.nombre }}</a> &nbsp;›&nbsp;
+    Cierre de curso
+</div>
+
+<h2 class="page-title">🔒 Cierre de curso</h2>
+<p class="page-subtitle">
+    Esta acción archivará todas las matrículas y pagos en el historial, y luego los borrará
+    de la operación viva para empezar un nuevo ciclo limpio.
+    <strong style="color:#c62828;">La acción es irreversible</strong>, pero todo queda guardado
+    permanentemente en el historial.
+</p>
+
+{# ─── Banner del curso ─────────────────────────── #}
+<div style="background:linear-gradient(135deg, #1a237e 0%, #283593 100%); color:white; padding:20px 24px; border-radius:12px; margin-bottom:20px;">
+    <h3 style="font-size:20px; font-weight:700; margin:0 0 4px;">{{ curso.nombre }}</h3>
+    <p style="font-size:13px; opacity:0.9; margin:0;">
+        {% if curso.categoria %}{{ curso.categoria.nombre }} · {% endif %}
+        {{ curso.modalidades_etiqueta }}
+        {% if jornada %}
+            <br>
+            <span style="background:rgba(255,255,255,0.15); padding:4px 12px; border-radius:14px; font-size:12px; margin-top:6px; display:inline-block;">
+                Jornada seleccionada: <strong>{{ jornada.descripcion_legible }}</strong>
+                {% if jornada.fecha_inicio %} · inicio {{ jornada.fecha_inicio|date:"d/m/Y" }}{% endif %}
+                {% if jornada.ciudad %} · {{ jornada.ciudad }}{% endif %}
+                · {{ jornada.get_modalidad_display }}
+            </span>
+        {% else %}
+            <br>
+            <span style="background:rgba(255,255,255,0.15); padding:4px 12px; border-radius:14px; font-size:12px; margin-top:6px; display:inline-block;">
+                <strong>Alcance: TODO el curso</strong> (todas las jornadas, presencial y online)
+            </span>
+        {% endif %}
+    </p>
+</div>
+
+{# ─── Selector de alcance / jornada ─────────────────────── #}
+<div class="card-box" style="margin-bottom:20px;">
+    <h3 style="color:#1a237e; font-size:15px; margin-bottom:12px;">📋 ¿Qué quieres cerrar?</h3>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+        <a href="{% url 'academia:cierre_preview' curso.pk %}"
+           class="btn {% if not jornada %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+            🌐 Todo el curso ({{ curso.jornadas_presencial_count|add:curso.jornadas_online_count }} jornada(s))
+        </a>
+        {% for j in jornadas_todas %}
+        <a href="{% url 'academia:cierre_preview' curso.pk %}?jornada={{ j.id }}"
+           class="btn {% if jornada and jornada.pk == j.pk %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+            {% if j.modalidad == 'online' %}🟢{% else %}🏫{% endif %}
+            {{ j.descripcion_legible }}
+            {% if j.fecha_inicio %} · {{ j.fecha_inicio|date:"d/m" }}{% endif %}
+            {% if j.ciudad %} · {{ j.ciudad }}{% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+{# ─── Resumen de lo que se archivará ─────────────────────── #}
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
+    <div class="card-box" style="background:#e8eaf6; border-left:4px solid #1a237e;">
+        <div style="font-size:12px; color:#555;">Matrículas a archivar</div>
+        <div style="font-size:28px; font-weight:700; color:#1a237e; margin-top:4px;">
+            {{ totales.total_matriculas }}
+        </div>
+    </div>
+    <div class="card-box" style="background:#fff8e1; border-left:4px solid #f0ad4e;">
+        <div style="font-size:12px; color:#555;">Pagos (abonos) a archivar</div>
+        <div style="font-size:28px; font-weight:700; color:#856404; margin-top:4px;">
+            {{ total_abonos }}
+        </div>
+    </div>
+    <div class="card-box" style="background:#e8f5e9; border-left:4px solid #2e7d32;">
+        <div style="font-size:12px; color:#555;">Total facturado</div>
+        <div style="font-size:22px; font-weight:700; color:#2e7d32; margin-top:4px;">
+            ${{ totales.total_facturado|floatformat:2 }}
+        </div>
+    </div>
+    <div class="card-box" style="background:#e3f2fd; border-left:4px solid #0d47a1;">
+        <div style="font-size:12px; color:#555;">Total cobrado</div>
+        <div style="font-size:22px; font-weight:700; color:#0d47a1; margin-top:4px;">
+            ${{ totales.total_cobrado|floatformat:2 }}
+        </div>
+    </div>
+    <div class="card-box" style="background:#ffebee; border-left:4px solid #c62828;">
+        <div style="font-size:12px; color:#555;">Saldo pendiente</div>
+        <div style="font-size:22px; font-weight:700; color:#c62828; margin-top:4px;">
+            ${{ totales.total_pendiente|floatformat:2 }}
+        </div>
+    </div>
+</div>
+
+<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
+    <span class="badge badge-pagado">✓ Pagado: {{ totales.conteo_pagado }}</span>
+    <span class="badge badge-parcial">◐ Parcial: {{ totales.conteo_parcial }}</span>
+    <span class="badge badge-pendiente">○ Pendiente: {{ totales.conteo_pendiente }}</span>
+    {% if totales.conteo_retiro %}
+    <span class="badge" style="background:#ececec; color:#555;">Retiros: {{ totales.conteo_retiro }}</span>
+    {% endif %}
+</div>
+
+{# ─── Lista detallada de lo que se archivará ─────────────── #}
+{% if matriculas %}
+<div class="table-wrap" style="margin-bottom:20px;">
+    <table>
+        <thead>
+            <tr>
+                <th>Cédula</th>
+                <th>Estudiante</th>
+                <th>Curso · Jornada</th>
+                <th>Modalidad</th>
+                <th>Sede</th>
+                <th>Valor</th>
+                <th>Pagado</th>
+                <th>Saldo</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in matriculas %}
+            <tr>
+                <td><strong>{{ m.estudiante.cedula }}</strong></td>
+                <td>{{ m.estudiante.apellidos }} {{ m.estudiante.nombres }}</td>
+                <td>
+                    {{ m.curso.nombre }}
+                    {% if m.jornada %}<br><small style="color:#888;">{{ m.jornada.descripcion_legible }}</small>{% endif %}
+                </td>
+                <td>
+                    <span class="badge badge-{{ m.modalidad }}">{{ m.get_modalidad_display }}</span>
+                </td>
+                <td>{{ m.sede }}</td>
+                <td>${{ m.valor_neto|floatformat:2 }}</td>
+                <td>${{ m.valor_pagado|floatformat:2 }}</td>
+                <td>${{ m.saldo|floatformat:2 }}</td>
+                <td>
+                    {% if m.estado_pago == 'Pagado' %}
+                        <span class="badge badge-pagado">Pagado</span>
+                    {% elif m.estado_pago == 'Parcial' %}
+                        <span class="badge badge-parcial">Parcial</span>
+                    {% elif m.estado_pago == 'Retiro' %}
+                        <span class="badge" style="background:#ececec; color:#555;">Retiro</span>
+                    {% else %}
+                        <span class="badge badge-pendiente">Pendiente</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state" style="background:white; border-radius:12px; padding:30px; margin-bottom:20px;">
+    <p style="font-size:14px;">No hay matrículas para el alcance seleccionado.</p>
+    <p style="font-size:12px; color:#aaa;">Elige otra jornada o el curso completo.</p>
+</div>
+{% endif %}
+
+{# ─── Form de confirmación ─────────────────────── #}
+{% if matriculas %}
+<div class="card-box" style="border:2px solid #c62828; background:#fff5f5;">
+    <h3 style="color:#c62828; font-size:17px; margin-bottom:10px;">⚠️ Confirmar cierre de curso</h3>
+    <p style="font-size:13px; color:#555; margin-bottom:16px;">
+        Al confirmar, se ejecutará lo siguiente <strong>de forma atómica</strong>:
+    </p>
+    <ol style="font-size:13px; color:#444; margin:0 0 16px 22px; line-height:1.7;">
+        <li>Se creará un registro de cierre con los totales congelados.</li>
+        <li>Cada matrícula y cada abono se copiará al historial archivado (snapshot completo: cédula, nombre, correo, celular, sede, jornada, modalidad, todos los pagos, recibos, comprobantes, etc.).</li>
+        <li>Las {{ totales.total_matriculas }} matrícula(s) y {{ total_abonos }} pago(s) se <strong>eliminarán</strong> de la operación viva.</li>
+        <li>Las alertas y recuperaciones asociadas también se limpian (caen en cascada).</li>
+        <li>Podrás consultar todo lo archivado en <em>Historial → Cursos cerrados</em>.</li>
+    </ol>
+
+    <form method="post" action="{% url 'academia:cierre_ejecutar' curso.pk %}">
+        {% csrf_token %}
+        {% if jornada %}<input type="hidden" name="jornada_id" value="{{ jornada.pk }}">{% endif %}
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:14px;">
+            <div>
+                <label class="form-label">Etiqueta del ciclo (opcional)</label>
+                <input type="text" name="ciclo_etiqueta" class="form-input"
+                       placeholder="Ej. Mayo 2026, Ciclo 2026-Q2, Promoción VIII…"
+                       maxlength="80">
+            </div>
+            <div>
+                <label class="form-label">Observaciones (opcional)</label>
+                <input type="text" name="observaciones" class="form-input"
+                       placeholder="Notas internas para este cierre.">
+            </div>
+        </div>
+
+        <div style="background:#fff8e1; border-left:4px solid #f0ad4e; padding:12px 16px; border-radius:8px; margin-bottom:14px;">
+            <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer;">
+                <input type="checkbox" name="limpiar_directorio" id="limpiar_directorio"
+                       style="margin-top:3px; transform:scale(1.2);">
+                <span style="font-size:13px; color:#444;">
+                    <strong style="color:#856404;">🧹 Limpiar también el directorio de estudiantes</strong><br>
+                    <span style="font-size:12px; color:#666;">
+                        Si marcas esto, los estudiantes que queden <em>sin matrículas vivas</em> en ningún
+                        otro curso se moverán al apartado <strong>Estudiantes archivados</strong> (consultable
+                        después) y desaparecerán del directorio activo. Los que sigan matriculados en otros
+                        cursos NO se tocan.
+                    </span>
+                </span>
+            </label>
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-danger"
+                    onclick="document.getElementById('confirm-final').classList.add('open');"
+                    style="font-weight:700;">
+                🔒 Realizar cierre y archivar todo
+            </button>
+            <a href="{% url 'academia:curso_jornadas' curso.pk %}" class="btn btn-secondary">
+                Cancelar
+            </a>
+        </div>
+
+        {# Modal de confirmación final #}
+        <div id="confirm-final"
+             style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; padding:20px;"
+             class="confirm-modal">
+            <style>
+                .confirm-modal.open { display:flex !important; }
+            </style>
+            <div style="background:white; border-radius:12px; max-width:480px; width:100%; padding:28px; box-shadow:0 10px 40px rgba(0,0,0,0.4);">
+                <h3 style="color:#c62828; font-size:18px; margin-bottom:8px;">⚠️ ¿Estás 100 % seguro?</h3>
+                <p style="font-size:14px; color:#444; margin-bottom:14px;">
+                    Vas a archivar y eliminar <strong>{{ totales.total_matriculas }} matrícula(s)</strong>
+                    y <strong>{{ total_abonos }} pago(s)</strong>
+                    {% if jornada %}de la jornada <em>{{ jornada.descripcion_legible }}</em>{% else %}de <em>todas las jornadas</em>{% endif %}.
+                </p>
+                <p style="font-size:13px; color:#666; margin-bottom:20px;">
+                    Todo quedará guardado en el historial y podrás consultarlo, exportarlo
+                    y filtrarlo después, pero <strong>no se podrá restaurar a la operación viva</strong>.
+                </p>
+                <div style="display:flex; gap:10px; justify-content:flex-end;">
+                    <button type="button" class="btn btn-secondary"
+                            onclick="document.getElementById('confirm-final').classList.remove('open');">
+                        No, cancelar
+                    </button>
+                    <button type="submit" class="btn btn-danger" style="font-weight:700;">
+                        Sí, archivar y limpiar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+{% endblock %}

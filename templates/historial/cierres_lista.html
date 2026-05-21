@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+
+{% block title %}Historial de cursos cerrados{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:archivo_index' %}">Archivo</a> &nbsp;›&nbsp;
+    📁 Estudiantes &nbsp;›&nbsp;
+    Cursos cerrados
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:8px;">
+    <div>
+        <h2 class="page-title">🗄️ Historial de Cursos Cerrados</h2>
+        <p class="page-subtitle">
+            Cada cierre es un ciclo completo archivado, agrupado por curso. Total: {{ total_cierres }} cierre{{ total_cierres|pluralize }}.
+        </p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="{% url 'academia:archivo_index' %}" class="btn btn-secondary">
+            ‹ Volver al archivo
+        </a>
+        <a href="{% url 'academia:historial_lista' %}" class="btn btn-secondary">
+            📚 Historial por año/mes
+        </a>
+    </div>
+</div>
+
+{# ─── Filtros ─────────────────────────────────────── #}
+<div class="card-box" style="margin-bottom:20px; padding:16px;">
+    <form method="get" style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap:10px; align-items:end;">
+        <div>
+            <label class="form-label" style="font-size:11px;">Buscar</label>
+            <input type="text" name="q" value="{{ filtros.q }}" class="form-input"
+                   placeholder="Curso, jornada, sede, ciclo…">
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Curso</label>
+            <select name="curso" class="form-input">
+                <option value="">— Todos —</option>
+                {% for c in cursos %}
+                    <option value="{{ c.id }}" {% if filtros.curso == c.id|stringformat:"s" %}selected{% endif %}>
+                        {{ c.nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Modalidad</label>
+            <select name="modalidad" class="form-input">
+                <option value="">— Todas —</option>
+                <option value="presencial" {% if filtros.modalidad == 'presencial' %}selected{% endif %}>Presencial</option>
+                <option value="online" {% if filtros.modalidad == 'online' %}selected{% endif %}>Online</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Año del cierre</label>
+            <select name="anio" class="form-input">
+                <option value="">— Todos —</option>
+                {% for a in anios %}
+                    <option value="{{ a }}" {% if filtros.anio == a|stringformat:"s" %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a href="{% url 'academia:cierre_historial' %}" class="btn btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</div>
+
+{# ─── Grupos por curso ─────────────────────────────── #}
+{% for g in grupos %}
+<div style="background:white; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); margin-bottom:18px; overflow:hidden;">
+
+    {# Cabecera del curso #}
+    <div style="background:linear-gradient(135deg, #1a237e 0%, #283593 100%); color:white; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h3 style="font-size:17px; font-weight:700; margin:0;">📘 {{ g.curso_nombre }}</h3>
+            <div style="font-size:12px; opacity:0.85; margin-top:3px;">
+                {{ g.total_cierres }} cierre{{ g.total_cierres|pluralize }} ·
+                {{ g.total_matriculas }} matrícula{{ g.total_matriculas|pluralize }} archivada{{ g.total_matriculas|pluralize }}
+            </div>
+        </div>
+        <div style="display:flex; gap:14px; font-size:12px; flex-wrap:wrap;">
+            <div>Facturado: <strong>${{ g.total_facturado|floatformat:2 }}</strong></div>
+            <div>Cobrado: <strong style="color:#FFD700;">${{ g.total_cobrado|floatformat:2 }}</strong></div>
+        </div>
+    </div>
+
+    {# Cierres del curso #}
+    <div style="padding:0;">
+        {% for c in g.cierres %}
+        <div style="border-bottom:1px solid #f0f0f0; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="flex:1; min-width:240px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    {% if c.alcance == 'global' %}
+                        <span style="font-weight:700; color:#c62828;">
+                            🌐 CIERRE GLOBAL
+                            {% if c.modalidad_global == 'presencial' %}— Presencial{% elif c.modalidad_global == 'online' %}— Online{% elif c.modalidad_global == 'todas' %}— Todas las modalidades{% endif %}
+                        </span>
+                    {% elif c.jornada_descripcion %}
+                        <span style="font-weight:600; color:#1a237e;">
+                            {% if c.jornada_modalidad == 'online' %}🟢{% else %}🏫{% endif %}
+                            {{ c.jornada_descripcion }}
+                        </span>
+                    {% else %}
+                        <span style="font-weight:600; color:#1a237e;">🌐 Todo el curso (todas las jornadas)</span>
+                    {% endif %}
+
+                    {% if c.ciclo_etiqueta %}
+                    <span style="background:#fff8e1; color:#856404; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:600;">
+                        {{ c.ciclo_etiqueta }}
+                    </span>
+                    {% endif %}
+
+                    {% if c.limpio_directorio %}
+                    <span style="background:#e8f5e9; color:#2e7d32; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:600;"
+                          title="Este cierre limpió el directorio de estudiantes">
+                        🧹 Directorio limpiado
+                    </span>
+                    {% endif %}
+                </div>
+                <div style="font-size:12px; color:#888; margin-top:4px;">
+                    Cerrado el {{ c.fecha_cierre|date:"d/m/Y H:i" }}
+                    {% if c.cerrado_por %} por {{ c.cerrado_por.get_full_name|default:c.cerrado_por.username }}{% endif %}
+                    {% if c.jornada_sede %} · 📍 {{ c.jornada_sede }}{% endif %}
+                </div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+                    <span class="badge" style="background:#e8eaf6; color:#1a237e;">
+                        {{ c.total_matriculas }} matr.
+                    </span>
+                    {% if c.conteo_pagado %}
+                    <span class="badge badge-pagado">✓ {{ c.conteo_pagado }} pagado</span>
+                    {% endif %}
+                    {% if c.conteo_parcial %}
+                    <span class="badge badge-parcial">◐ {{ c.conteo_parcial }} parcial</span>
+                    {% endif %}
+                    {% if c.conteo_pendiente %}
+                    <span class="badge badge-pendiente">○ {{ c.conteo_pendiente }} pend.</span>
+                    {% endif %}
+                    {% if c.conteo_retiro %}
+                    <span class="badge" style="background:#ececec; color:#555;">{{ c.conteo_retiro }} retiro</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div style="text-align:right; min-width:180px;">
+                <div style="font-size:11px; color:#888;">Facturado / Cobrado</div>
+                <div style="font-size:14px; font-weight:700; color:#2e7d32;">
+                    ${{ c.total_facturado|floatformat:2 }}
+                </div>
+                <div style="font-size:13px; font-weight:600; color:#0d47a1;">
+                    ${{ c.total_cobrado|floatformat:2 }} cobrado
+                </div>
+            </div>
+
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <a href="{% url 'academia:cierre_detalle' c.pk %}" class="btn btn-primary btn-sm">
+                    Ver detalle
+                </a>
+                <a href="{% url 'academia:cierre_export' c.pk %}" class="btn btn-success btn-sm">
+                    📥 Excel
+                </a>
+                {% if request.user.is_superuser or request.user.groups.all.0.name == 'Administradores' %}
+                <form method="post" action="{% url 'academia:cierre_eliminar' c.pk %}" style="display:inline;" onsubmit="return false;">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-danger btn-sm"
+                            onclick="confirmarAccion(this.closest('form'), '¿Eliminar el cierre «{{ c.encabezado|escapejs }}» del historial? Esta acción no se puede deshacer.', 'danger')">
+                        Eliminar
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% empty %}
+<div class="empty-state" style="background:white; border-radius:12px; padding:40px;">
+    <p style="font-size:15px; margin-bottom:8px;">No hay cursos cerrados todavía.</p>
+    <p style="font-size:13px; color:#aaa;">
+        Cuando termines un ciclo, entra a un curso y usa el botón
+        <strong>🔒 Cierre de curso</strong> para archivar todo.
+    </p>
+    <a href="{% url 'academia:cursos_lista' modalidad='presencial' %}" class="btn btn-primary" style="margin-top:16px;">
+        Ir a cursos
+    </a>
+</div>
+{% endfor %}
+
+{% endblock %}

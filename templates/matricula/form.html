@@ -759,7 +759,15 @@
                 if (data.ok && data.encontrado) {
                     const e = data.estudiante;
                     CAMPOS_ESTUDIANTE.forEach(c => setCampoEstudiante(c, e[c]));
-                    if (cedulaStatus) { cedulaStatus.textContent = '✓ Estudiante existente — datos cargados'; cedulaStatus.className = 'cedula-found'; }
+                    if (cedulaStatus) {
+                        if (data.desde_archivo) {
+                            cedulaStatus.textContent = '📁 Estudiante recuperado del archivo — datos cargados';
+                            cedulaStatus.className = 'cedula-found';
+                        } else {
+                            cedulaStatus.textContent = '✓ Estudiante existente — datos cargados';
+                            cedulaStatus.className = 'cedula-found';
+                        }
+                    }
                     matriculasEstudiante = data.matriculas || [];
                 } else {
                     limpiarCamposEstudiante();

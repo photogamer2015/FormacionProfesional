@@ -3,6 +3,7 @@ from django.db.models import Q
 from .models import (
     Abono, Adicional, CategoriaEgreso, Categoria, Comprobante, Curso, Egreso,
     Estudiante, JornadaCurso, Matricula, PersonaExterna, RecuperacionPendiente,
+    Sede,
 )
 
 
@@ -63,47 +64,108 @@ class CursoForm(forms.ModelForm):
 class JornadaCursoForm(forms.ModelForm):
     """
     Form para crear/editar una jornada de un curso.
-    El campo `descripcion` ahora usa choices estandarizados
-    (Lun-Mié-Vie / Mar-Mié-Jue / Mar-Jue / Sábados Intensivos / Domingos Intensivos).
+    El campo `descripcion` usa choices estandarizados, e incluye la opción
+    'Otros' que habilita un campo de texto libre (`descripcion_otros`).
+    La ciudad ahora se elige desde el catálogo de Sedes administrable.
     """
     class Meta:
         model = JornadaCurso
         fields = [
-            'modalidad', 'descripcion', 'fecha_inicio',
-            'hora_inicio', 'hora_fin', 'ciudad', 'activo',
+            'modalidad', 'descripcion', 'descripcion_otros', 'fecha_inicio',
+            'hora_inicio', 'hora_fin', 'sede', 'activo',
         ]
         widgets = {
             'modalidad': forms.Select(attrs={'class': 'form-input'}),
             # ↓ Antes era TextInput, ahora es Select con los días estándar
-            'descripcion': forms.Select(attrs={'class': 'form-input'}),
+            'descripcion': forms.Select(attrs={'class': 'form-input', 'id': 'id_descripcion_dias'}),
+            'descripcion_otros': forms.TextInput(attrs={
+                'class': 'form-input',
+                'id': 'id_descripcion_otros',
+                'placeholder': 'Ej. Viernes y Sábado',
+            }),
             'fecha_inicio': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
             'hora_inicio': forms.TimeInput(attrs={'class': 'form-input', 'type': 'time'}),
             'hora_fin': forms.TimeInput(attrs={'class': 'form-input', 'type': 'time'}),
-            'ciudad': forms.Select(attrs={'class': 'form-input'}, choices=[
-                ('', '— Selecciona ciudad —'),
-                ('Guayaquil', 'Guayaquil'),
-                ('Quito', 'Quito'),
-            ]),
+            'sede': forms.Select(attrs={'class': 'form-input'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Placeholder limpio como primera opción del Select
+        # Placeholder limpio como primera opción del Select de días
         self.fields['descripcion'].widget.choices = [
             ('', '— Selecciona los días —'),
         ] + list(JornadaCurso._meta.get_field('descripcion').choices)
-        # Ciudad NO es obligatoria por defecto en el campo (se valida en clean())
-        self.fields['ciudad'].required = False
+
+        # El selector de sede usa solo las sedes activas, más la que ya
+        # tuviera la jornada (aunque esté desactivada) para no perderla al editar.
+        sede_qs = Sede.objects.filter(activa=True)
+        if self.instance and self.instance.pk and self.instance.sede_id:
+            sede_qs = Sede.objects.filter(
+                Q(activa=True) | Q(pk=self.instance.sede_id)
+            )
+        self.fields['sede'].queryset = sede_qs.distinct()
+        self.fields['sede'].empty_label = '— Selecciona sede —'
+        self.fields['sede'].required = False
+        self.fields['descripcion_otros'].required = False
 
     def clean(self):
         cleaned_data = super().clean()
         modalidad = cleaned_data.get('modalidad')
-        ciudad = cleaned_data.get('ciudad', '').strip()
+        sede = cleaned_data.get('sede')
+        descripcion = cleaned_data.get('descripcion')
+        descripcion_otros = (cleaned_data.get('descripcion_otros') or '').strip()
 
-        if modalidad == 'presencial' and not ciudad:
-            self.add_error('ciudad', 'Debes seleccionar una ciudad para la modalidad presencial.')
-        
+        if modalidad == 'presencial' and not sede:
+            self.add_error('sede', 'Debes seleccionar una sede para la modalidad presencial.')
+
+        if descripcion == 'otros' and not descripcion_otros:
+            self.add_error(
+                'descripcion_otros',
+                'Escribe los días personalizados cuando eliges "Otros".'
+            )
+        # Si no es "otros", limpiamos el texto libre para evitar datos sueltos
+        if descripcion != 'otros':
+            cleaned_data['descripcion_otros'] = ''
+
         return cleaned_data
+
+
+class SedeForm(forms.ModelForm):
+    """Form para que el admin cree/edite sedes desde el panel (sin tocar código)."""
+    class Meta:
+        model = Sede
+        fields = ['nombre', 'pais', 'direccion', 'telefono', 'orden', 'activa']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'form-input', 'placeholder': 'Ej. Guayaquil',
+            }),
+            'pais': forms.TextInput(attrs={
+                'class': 'form-input', 'placeholder': 'Ej. Ecuador',
+            }),
+            'direccion': forms.TextInput(attrs={
+                'class': 'form-input', 'placeholder': 'Dirección (opcional)',
+            }),
+            'telefono': forms.TextInput(attrs={
+                'class': 'form-input', 'placeholder': 'Teléfono (opcional)',
+            }),
+            'orden': forms.NumberInput(attrs={'class': 'form-input', 'min': 0}),
+            'activa': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+        }
+        labels = {
+            'nombre': 'Nombre de la sede / ciudad',
+            'pais': 'País',
+            'direccion': 'Dirección',
+            'telefono': 'Teléfono',
+            'orden': 'Orden de aparición',
+            'activa': 'Sede activa',
+        }
+
+    def clean_nombre(self):
+        return (self.cleaned_data.get('nombre') or '').strip()
+
+    def clean_pais(self):
+        pais = (self.cleaned_data.get('pais') or '').strip()
+        return pais or 'Ecuador'
 
 
 class EstudianteForm(forms.ModelForm):

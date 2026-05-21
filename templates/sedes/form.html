@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if modo == 'crear' %}Nueva sede{% else %}Editar sede{% endif %}{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:admin_dashboard' %}">Dashboard Admin</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:sedes_lista' %}">Sedes</a> &nbsp;›&nbsp;
+    {% if modo == 'crear' %}Nueva{% else %}Editar{% endif %}
+</div>
+
+<h2 class="page-title">
+    {% if modo == 'crear' %}🏢 Nueva sede{% else %}✏️ Editar sede: {{ sede.nombre }}{% endif %}
+</h2>
+<p class="page-subtitle">
+    {% if modo == 'crear' %}
+        Crea una sede o campus. Aparecerá disponible al crear jornadas presenciales.
+    {% else %}
+        Modifica los datos de esta sede.
+        {% if num_jornadas %}<br>📌 Esta sede está siendo usada por {{ num_jornadas }} jornada{{ num_jornadas|pluralize }}.{% endif %}
+    {% endif %}
+</p>
+
+<div class="card-box" style="max-width:560px;">
+    <form method="post" style="display:flex; flex-direction:column; gap:16px;">
+        {% csrf_token %}
+
+        <div>
+            <label class="form-label">{{ form.nombre.label }} *</label>
+            {{ form.nombre }}
+            {{ form.nombre.errors }}
+        </div>
+
+        <div>
+            <label class="form-label">{{ form.pais.label }} *</label>
+            {{ form.pais }}
+            {{ form.pais.errors }}
+            <p style="font-size:11px; color:#888; margin-top:4px;">
+                Las sedes se agrupan por país en el listado. Ej. Ecuador, Venezuela.
+            </p>
+        </div>
+
+        <div>
+            <label class="form-label">{{ form.direccion.label }}</label>
+            {{ form.direccion }}
+            {{ form.direccion.errors }}
+        </div>
+
+        <div>
+            <label class="form-label">{{ form.telefono.label }}</label>
+            {{ form.telefono }}
+            {{ form.telefono.errors }}
+        </div>
+
+        <div>
+            <label class="form-label">{{ form.orden.label }}</label>
+            {{ form.orden }}
+            {{ form.orden.errors }}
+            <p style="font-size:11px; color:#888; margin-top:4px;">
+                Menor número aparece primero dentro de su país.
+            </p>
+        </div>
+
+        <div>
+            <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;">
+                {{ form.activa }} {{ form.activa.label }}
+            </label>
+            {{ form.activa.errors }}
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:6px;">
+            <a href="{% url 'academia:sedes_lista' %}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">
+                {% if modo == 'crear' %}Crear sede{% else %}💾 Guardar cambios{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

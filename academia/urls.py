@@ -1,5 +1,5 @@
 from django.urls import path, re_path
-from . import views, views_pagos, views_comprobantes, views_admin, views_adicional
+from . import views, views_pagos, views_comprobantes, views_admin, views_adicional, views_cierre, views_sedes
 
 app_name = 'academia'
 
@@ -147,11 +147,30 @@ urlpatterns = [
     path('admin-panel/egresos/<int:pk>/eliminar/',
          views_admin.egreso_eliminar, name='admin_egreso_eliminar'),
 
+    # ── Cierre Administrativo (corte de caja) ──
+    path('admin-panel/cierre/',
+         views_admin.cierre_admin_preview, name='cierre_admin_preview'),
+    path('admin-panel/cierre/ejecutar/',
+         views_admin.cierre_admin_ejecutar, name='cierre_admin_ejecutar'),
+    path('admin-panel/cierre/historial/',
+         views_admin.cierre_admin_historial, name='cierre_admin_historial'),
+    path('admin-panel/cierre/<int:pk>/',
+         views_admin.cierre_admin_detalle, name='cierre_admin_detalle'),
+    path('admin-panel/cierre/<int:pk>/eliminar/',
+         views_admin.cierre_admin_eliminar, name='cierre_admin_eliminar'),
+
     # ── Exportación CSV ───────────────────────────────────────
     path('admin-panel/export/reporte/',
          views_admin.export_reporte_mes, name='admin_export_reporte'),
     path('admin-panel/export/egresos/',
          views_admin.export_egresos, name='admin_export_egresos'),
+
+    # ── Sedes / Campus (administrable solo por admin) ──
+    path('admin-panel/sedes/', views_sedes.sedes_lista, name='sedes_lista'),
+    path('admin-panel/sedes/nueva/', views_sedes.sede_crear, name='sede_crear'),
+    path('admin-panel/sedes/<int:pk>/editar/', views_sedes.sede_editar, name='sede_editar'),
+    path('admin-panel/sedes/<int:pk>/toggle/', views_sedes.sede_toggle, name='sede_toggle'),
+    path('admin-panel/sedes/<int:pk>/eliminar/', views_sedes.sede_eliminar, name='sede_eliminar'),
 
     # ── Adicional (Certificados, Examen Supletorio, Camisas extra) ──
     path('adicional/',
@@ -186,6 +205,35 @@ urlpatterns = [
     # ── Examen Supletorio rápido (desde matrícula) ──
     path('matricula/<int:matricula_pk>/supletorio/',
          views_adicional.supletorio_marcar, name='supletorio_marcar'),
+
+     # ── Cierre de Curso e Historial Archivado ──
+     path('cursos/<int:curso_pk>/cierre/',
+          views_cierre.cierre_preview, name='cierre_preview'),
+     path('cursos/<int:curso_pk>/cierre/ejecutar/',
+          views_cierre.cierre_ejecutar, name='cierre_ejecutar'),
+
+     # ── Cierre GLOBAL (todos los cursos de una modalidad) ──
+     path('cursos/cierre-global/<str:modalidad>/',
+          views_cierre.cierre_global_preview, name='cierre_global_preview'),
+     path('cursos/cierre-global/<str:modalidad>/ejecutar/',
+          views_cierre.cierre_global_ejecutar, name='cierre_global_ejecutar'),
+
+     path('historial/archivo/',
+          views_cierre.archivo_index, name='archivo_index'),
+     path('historial/cierres/',
+          views_cierre.cierre_historial, name='cierre_historial'),
+     path('historial/cierres/<int:cierre_pk>/',
+          views_cierre.cierre_detalle, name='cierre_detalle'),
+     path('historial/cierres/<int:cierre_pk>/exportar/',
+          views_cierre.cierre_export, name='cierre_export'),
+     path('historial/cierres/<int:cierre_pk>/eliminar/',
+          views_cierre.cierre_eliminar, name='cierre_eliminar'),
+
+     # ── Estudiantes archivados (directorio histórico) ──
+     path('estudiantes/archivados/',
+          views_cierre.estudiantes_archivados_lista, name='estudiantes_archivados_lista'),
+     path('estudiantes/archivados/exportar/',
+          views_cierre.estudiantes_archivados_export, name='estudiantes_archivados_export'),
 
      # ── Bot simple (keyword-based) ──────────────────────────────
      path('assistant/simple-chat/', views.assistant_simple_chat, name='assistant_simple_chat'),

@@ -604,21 +604,123 @@ def pagos_export_pdf(request):
 # Historial de matriculados (por año / mes)
 # ═════════════════════════════════════════════════════════════════
 
+class _HistorialItemArchivado:
+    """
+    Adaptador que envuelve una MatriculaArchivada y expone la MISMA interfaz
+    que una Matricula viva, para que el template del historial la pinte sin
+    cambios. Marca `es_archivada=True` para que el template pueda mostrar una
+    etiqueta distintiva.
+    """
+
+    def __init__(self, archivada):
+        self._a = archivada
+        self.es_archivada = True
+        self.fecha_matricula = archivada.fecha_matricula
+        self.modalidad = archivada.modalidad
+        self.valor_curso = archivada.valor_curso
+        self.valor_pagado = archivada.valor_pagado or Decimal('0.00')
+        self.saldo = archivada.saldo or Decimal('0.00')
+        self.estado_pago = archivada.estado_pago
+        self.sede = archivada.sede or '—'
+        self._orden_id = archivada.pk
+        # Datos para el cierre asociado (por si el template quiere enlazar)
+        self.cierre_id = archivada.cierre_id
+
+    def get_modalidad_display(self):
+        return 'Online' if self.modalidad == 'online' else 'Presencial'
+
+    @property
+    def estudiante(self):
+        """Devuelve un objeto ligero con cedula/apellidos/nombres/pk."""
+        a = self._a
+        # Si el estudiante original sigue vivo, usar su pk real para el enlace.
+        pk = a.estudiante_id
+        return _EstudianteArchivadoProxy(
+            cedula=a.cedula,
+            apellidos=a.apellidos,
+            nombres=a.nombres,
+            pk=pk,
+        )
+
+    @property
+    def curso(self):
+        return _CursoProxy(
+            nombre=self._a.curso_nombre,
+            categoria_nombre=self._a.curso_categoria,
+        )
+
+
+class _EstudianteArchivadoProxy:
+    def __init__(self, cedula, apellidos, nombres, pk):
+        self.cedula = cedula
+        self.apellidos = apellidos
+        self.nombres = nombres
+        self.pk = pk
+
+    @property
+    def nombre_completo(self):
+        return f'{self.apellidos} {self.nombres}'.strip()
+
+
+class _CursoProxy:
+    def __init__(self, nombre, categoria_nombre=''):
+        self.nombre = nombre
+        self.categoria = _CategoriaProxy(categoria_nombre) if categoria_nombre else None
+
+
+class _CategoriaProxy:
+    def __init__(self, nombre):
+        self.nombre = nombre
+
+
 @matricula_requerida
 def historial_lista(request):
     """
     Historial de matrículas agrupado por año y mes.
     Permite filtrar por año, mes, curso y modalidad.
+
+    IMPORTANTE: combina matrículas VIVAS + matrículas ARCHIVADAS (de los cierres),
+    para que el historial mensual NUNCA se pierda al ejecutar un cierre de curso.
+    Las archivadas se muestran con una etiqueta "archivada" pero conservan su
+    fecha, curso, modalidad, estado de pago, etc.
     """
+    from .models import MatriculaArchivada
+
     qs, filtros = _filtrar_matriculas(request)
     qs = qs.order_by('-fecha_matricula', '-id')
+
+    # ── También las matrículas archivadas (mismos filtros) ──
+    arch_qs = MatriculaArchivada.objects.select_related('cierre', 'estudiante', 'curso')
+    if filtros['curso']:
+        arch_qs = arch_qs.filter(curso_id=filtros['curso'])
+    if filtros['modalidad'] in ('presencial', 'online'):
+        arch_qs = arch_qs.filter(modalidad=filtros['modalidad'])
+    if filtros['anio'].isdigit():
+        arch_qs = arch_qs.filter(fecha_matricula__year=int(filtros['anio']))
+    if filtros['mes'].isdigit() and 1 <= int(filtros['mes']) <= 12:
+        arch_qs = arch_qs.filter(fecha_matricula__month=int(filtros['mes']))
+    if filtros['q']:
+        arch_qs = arch_qs.filter(
+            Q(cedula__icontains=filtros['q'])
+            | Q(apellidos__icontains=filtros['q'])
+            | Q(nombres__icontains=filtros['q'])
+            | Q(curso_nombre__icontains=filtros['q'])
+        )
+    if filtros['estado'] in ('Pagado', 'Parcial', 'Pendiente', 'Retiro'):
+        arch_qs = arch_qs.filter(estado_pago=filtros['estado'])
+
+    # Envolver las archivadas en un adaptador con la misma interfaz que Matricula
+    items_archivados = [_HistorialItemArchivado(a) for a in arch_qs]
+
+    # Combinar ambas fuentes
+    todos = list(qs) + items_archivados
 
     # Agrupar por año → mes → matrículas
     grupos = defaultdict(lambda: defaultdict(list))
     totales_por_anio = defaultdict(lambda: {'count': 0, 'facturado': Decimal('0.00'), 'cobrado': Decimal('0.00')})
     totales_por_mes = defaultdict(lambda: {'count': 0, 'facturado': Decimal('0.00'), 'cobrado': Decimal('0.00')})
 
-    for m in qs:
+    for m in todos:
         anio = m.fecha_matricula.year
         mes = m.fecha_matricula.month
         grupos[anio][mes].append(m)
@@ -638,10 +740,16 @@ def historial_lista(request):
         meses_dict = grupos[anio]
         meses_lista = []
         for mes in sorted(meses_dict.keys(), reverse=True):
+            # Ordenar las matrículas del mes por día descendente
+            matriculas_mes = sorted(
+                meses_dict[mes],
+                key=lambda x: (x.fecha_matricula, getattr(x, '_orden_id', 0)),
+                reverse=True
+            )
             meses_lista.append({
                 'numero': mes,
                 'nombre': MESES_ES[mes],
-                'matriculas': meses_dict[mes],
+                'matriculas': matriculas_mes,
                 'totales': totales_por_mes[(anio, mes)],
             })
         estructura.append({
@@ -651,10 +759,11 @@ def historial_lista(request):
         })
 
     cursos = Curso.objects.filter(activo=True).order_by('nombre')
-    anios_disponibles = sorted(
-        set(Matricula.objects.dates('fecha_matricula', 'year').values_list('fecha_matricula__year', flat=True)),
-        reverse=True
-    )
+
+    # Años disponibles: vivos + archivados
+    anios_vivos = set(Matricula.objects.dates('fecha_matricula', 'year').values_list('fecha_matricula__year', flat=True))
+    anios_arch = set(MatriculaArchivada.objects.dates('fecha_matricula', 'year').values_list('fecha_matricula__year', flat=True))
+    anios_disponibles = sorted(anios_vivos | anios_arch, reverse=True)
 
     return render(request, 'historial/lista.html', {
         'estructura': estructura,
@@ -662,7 +771,8 @@ def historial_lista(request):
         'anios': anios_disponibles,
         'meses_es': MESES_ES,
         'filtros': filtros,
-        'total_general': qs.count(),
+        'total_general': len(todos),
+        'total_archivadas': len(items_archivados),
     })
 
 
@@ -671,16 +781,40 @@ def historial_export(request):
     """
     Descarga del historial como Excel. El archivo tiene una hoja por año
     (o una sola si se filtró por año específico).
+    Incluye matrículas vivas + archivadas (de cierres).
     """
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from .models import MatriculaArchivada
 
     qs, filtros = _filtrar_matriculas(request)
     qs = qs.order_by('-fecha_matricula', '-id')
 
+    # ── Archivadas con los mismos filtros ──
+    arch_qs = MatriculaArchivada.objects.select_related('cierre', 'estudiante', 'curso')
+    if filtros['curso']:
+        arch_qs = arch_qs.filter(curso_id=filtros['curso'])
+    if filtros['modalidad'] in ('presencial', 'online'):
+        arch_qs = arch_qs.filter(modalidad=filtros['modalidad'])
+    if filtros['anio'].isdigit():
+        arch_qs = arch_qs.filter(fecha_matricula__year=int(filtros['anio']))
+    if filtros['mes'].isdigit() and 1 <= int(filtros['mes']) <= 12:
+        arch_qs = arch_qs.filter(fecha_matricula__month=int(filtros['mes']))
+    if filtros['q']:
+        arch_qs = arch_qs.filter(
+            Q(cedula__icontains=filtros['q'])
+            | Q(apellidos__icontains=filtros['q'])
+            | Q(nombres__icontains=filtros['q'])
+            | Q(curso_nombre__icontains=filtros['q'])
+        )
+    if filtros['estado'] in ('Pagado', 'Parcial', 'Pendiente', 'Retiro'):
+        arch_qs = arch_qs.filter(estado_pago=filtros['estado'])
+
+    todos = list(qs) + [_HistorialItemArchivado(a) for a in arch_qs]
+
     # Agrupar por año
     por_anio = defaultdict(list)
-    for m in qs:
+    for m in todos:
         por_anio[m.fecha_matricula.year].append(m)
 
     if not por_anio:
@@ -739,6 +873,12 @@ def historial_export(request):
         por_mes = defaultdict(list)
         for m in por_anio[anio]:
             por_mes[m.fecha_matricula.month].append(m)
+        # Ordenar cada mes por fecha descendente (combina vivas + archivadas)
+        for mes_key in por_mes:
+            por_mes[mes_key].sort(
+                key=lambda x: (x.fecha_matricula, getattr(x, '_orden_id', getattr(x, 'id', 0))),
+                reverse=True
+            )
 
         current_row = 3
         total_anio_facturado = Decimal('0.00')
@@ -858,10 +998,14 @@ def historial_export(request):
 def estudiantes_lista(request):
     """
     Listado de estudiantes con búsqueda. Cada estudiante muestra el conteo
-    de cursos matriculados y un enlace al detalle.
+    de cursos matriculados, sus jornadas/sedes y un enlace al detalle.
     """
     q = request.GET.get('q', '').strip()
-    qs = Estudiante.objects.annotate(num_matriculas=Count('matriculas')).order_by('apellidos', 'nombres')
+    qs = Estudiante.objects.annotate(
+        num_matriculas=Count('matriculas')
+    ).prefetch_related(
+        'matriculas__jornada', 'matriculas__jornada__sede', 'matriculas__curso'
+    ).order_by('apellidos', 'nombres')
 
     if q:
         qs = qs.filter(
@@ -872,10 +1016,26 @@ def estudiantes_lista(request):
             | Q(celular__icontains=q)
         )
 
+    # Construir, por estudiante, el resumen de jornada(s) y sede(s) de sus matrículas.
+    estudiantes = list(qs)
+    for e in estudiantes:
+        jornadas_set = []
+        sedes_set = []
+        for m in e.matriculas.all():
+            if m.jornada_id:
+                etiqueta_dia = m.jornada.descripcion_legible
+                if etiqueta_dia and etiqueta_dia not in jornadas_set:
+                    jornadas_set.append(etiqueta_dia)
+            sede_nombre = (m.sede or '').strip()
+            if sede_nombre and sede_nombre != '—' and sede_nombre not in sedes_set:
+                sedes_set.append(sede_nombre)
+        e.jornadas_resumen = ' · '.join(jornadas_set) if jornadas_set else '—'
+        e.sedes_resumen = ' · '.join(sedes_set) if sedes_set else '—'
+
     return render(request, 'estudiantes/lista.html', {
-        'estudiantes': qs,
+        'estudiantes': estudiantes,
         'q': q,
-        'total': qs.count(),
+        'total': len(estudiantes),
     })
 
 
@@ -894,7 +1054,7 @@ def estudiantes_por_curso(request):
     for curso in cursos_qs:
         if curso_id and str(curso.id) != curso_id:
             continue
-        mat_qs = curso.matriculas.select_related('estudiante', 'jornada').order_by(
+        mat_qs = curso.matriculas.select_related('estudiante', 'jornada', 'jornada__sede').order_by(
             'estudiante__apellidos', 'estudiante__nombres'
         )
         if modalidad in ('presencial', 'online'):
@@ -981,6 +1141,7 @@ def estudiantes_export(request):
         headers = [
             'Cédula', 'Apellidos', 'Nombres', 'Edad',
             'Correo', 'Celular', 'Ciudad', 'Nivel',
+            'Jornada', 'Sede',
             'Modalidad', 'Fecha matrícula', 'Valor', 'Pagado', 'Saldo', 'Estado',
         ]
 
@@ -990,7 +1151,7 @@ def estudiantes_export(request):
 
         hojas_creadas = 0
         for curso in cursos_qs:
-            mat_qs = curso.matriculas.select_related('estudiante').order_by(
+            mat_qs = curso.matriculas.select_related('estudiante', 'jornada', 'jornada__sede').order_by(
                 'estudiante__apellidos', 'estudiante__nombres'
             )
             if modalidad in ('presencial', 'online'):
@@ -1026,6 +1187,8 @@ def estudiantes_export(request):
                     e.cedula, e.apellidos, e.nombres, e.edad or '',
                     e.correo or '', e.celular or '', e.ciudad or '',
                     e.get_nivel_formacion_display() if e.nivel_formacion else '',
+                    m.jornada.descripcion_legible if m.jornada_id else '',
+                    m.sede if m.sede != '—' else '',
                     m.get_modalidad_display(),
                     m.fecha_matricula.strftime('%d/%m/%Y') if m.fecha_matricula else '',
                     float(m.valor_curso or 0),
@@ -1070,6 +1233,8 @@ def estudiantes_export(request):
     # Modo plano: una sola hoja con todos los estudiantes
     estudiantes_qs = Estudiante.objects.annotate(
         num_matriculas=Count('matriculas')
+    ).prefetch_related(
+        'matriculas__jornada', 'matriculas__jornada__sede', 'matriculas__curso'
     ).order_by('apellidos', 'nombres')
 
     if q:
@@ -1082,7 +1247,7 @@ def estudiantes_export(request):
     headers = [
         'Cédula', 'Apellidos', 'Nombres', 'Edad',
         'Correo', 'Celular', 'Ciudad', 'Nivel formación',
-        'Título profesional', '# Matrículas', 'Cursos',
+        'Título profesional', 'Jornada(s)', 'Sede(s)', '# Matrículas', 'Cursos',
     ]
 
     rows = []
@@ -1090,11 +1255,24 @@ def estudiantes_export(request):
         cursos_str = ', '.join(
             sorted({m.curso.nombre for m in e.matriculas.all()})
         )
+        # Resumen de jornadas y sedes (sin repetir)
+        jornadas_set = []
+        sedes_set = []
+        for m in e.matriculas.all():
+            if m.jornada_id:
+                etiqueta_dia = m.jornada.descripcion_legible
+                if etiqueta_dia and etiqueta_dia not in jornadas_set:
+                    jornadas_set.append(etiqueta_dia)
+            sede_nombre = (m.sede or '').strip()
+            if sede_nombre and sede_nombre != '—' and sede_nombre not in sedes_set:
+                sedes_set.append(sede_nombre)
         rows.append([
             e.cedula, e.apellidos, e.nombres, e.edad or '',
             e.correo or '', e.celular or '', e.ciudad or '',
             e.get_nivel_formacion_display() if e.nivel_formacion else '',
             e.titulo_profesional or '',
+            ' · '.join(jornadas_set),
+            ' · '.join(sedes_set),
             e.num_matriculas,
             cursos_str,
         ])

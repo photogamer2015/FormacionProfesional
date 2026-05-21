@@ -12,9 +12,11 @@
         <h2 class="page-title">👥 Directorio de Estudiantes</h2>
         <p class="page-subtitle">Total: {{ total }} estudiante{{ total|pluralize }} registrado{{ total|pluralize }}.</p>
     </div>
-    <div style="display:flex; gap:8px;">
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <a href="{% url 'academia:estudiantes_export' %}?q={{ q }}" class="btn btn-success">📥 Excel (todos)</a>
         <a href="{% url 'academia:estudiantes_por_curso' %}" class="btn btn-secondary">Ver por curso</a>
+        <a href="{% url 'academia:archivo_index' %}" class="btn btn-secondary"
+           style="background:#455a64; color:white;">🗄️ Archivo</a>
     </div>
 </div>
 
@@ -46,6 +48,8 @@
                 <th>Correo</th>
                 <th>Celular</th>
                 <th>Ciudad</th>
+                <th>Jornada</th>
+                <th>Sede</th>
                 <th>Nivel formación</th>
                 <th>Matrículas</th>
                 <th>Acciones</th>
@@ -60,6 +64,8 @@
                 <td>{{ e.correo|default:'—' }}</td>
                 <td>{{ e.celular|default:'—' }}</td>
                 <td>{{ e.ciudad|default:'—' }}</td>
+                <td style="font-size:12px;">{{ e.jornadas_resumen }}</td>
+                <td style="font-size:12px;">{{ e.sedes_resumen }}</td>
                 <td>{{ e.get_nivel_formacion_display|default:'—' }}</td>
                 <td>
                     {% if e.num_matriculas > 0 %}

@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+
+{% block title %}Estudiantes archivados{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:archivo_index' %}">Archivo</a> &nbsp;›&nbsp;
+    📁 Estudiantes &nbsp;›&nbsp;
+    Estudiantes archivados
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:8px;">
+    <div>
+        <h2 class="page-title">🗄️ Estudiantes archivados</h2>
+        <p class="page-subtitle">
+            Estudiantes que se movieron al historial cuando se ejecutó un cierre con "Limpiar directorio".
+            Total: {{ total }} estudiante{{ total|pluralize }}.
+        </p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="{% url 'academia:archivo_index' %}" class="btn btn-secondary">
+            ‹ Volver al archivo
+        </a>
+        <a href="{% url 'academia:estudiantes_lista' %}" class="btn btn-secondary">
+            👥 Directorio vivo
+        </a>
+        <a href="{% url 'academia:estudiantes_archivados_export' %}?q={{ filtros.q }}&cierre={{ filtros.cierre }}&anio={{ filtros.anio }}"
+           class="btn btn-success">
+            📥 Excel
+        </a>
+    </div>
+</div>
+
+{# ─── Filtros ─────────────────────── #}
+<div class="card-box" style="margin-bottom:20px; padding:16px;">
+    <form method="get" style="display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:10px; align-items:end;">
+        <div>
+            <label class="form-label" style="font-size:11px;">Buscar</label>
+            <input type="text" name="q" value="{{ filtros.q }}" class="form-input"
+                   placeholder="Cédula, nombre, correo, celular…">
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Cierre asociado</label>
+            <select name="cierre" class="form-input">
+                <option value="">— Todos —</option>
+                {% for c in cierres_disponibles %}
+                    <option value="{{ c.id }}" {% if filtros.cierre == c.id|stringformat:"s" %}selected{% endif %}>
+                        {{ c.encabezado|truncatechars:60 }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Año archivo</label>
+            <select name="anio" class="form-input">
+                <option value="">— Todos —</option>
+                {% for a in anios %}
+                    <option value="{{ a }}" {% if filtros.anio == a|stringformat:"s" %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a href="{% url 'academia:estudiantes_archivados_lista' %}" class="btn btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</div>
+
+{# ─── Tabla ─────────────────────── #}
+<div class="table-wrap">
+    {% if estudiantes %}
+    <table>
+        <thead>
+            <tr>
+                <th>Cédula</th>
+                <th>Apellidos y Nombres</th>
+                <th>Edad</th>
+                <th>Correo</th>
+                <th>Celular</th>
+                <th>Ciudad</th>
+                <th>Nivel formación</th>
+                <th>Archivado en</th>
+                <th>Cierre asociado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in estudiantes %}
+            <tr>
+                <td><strong>{{ e.cedula }}</strong></td>
+                <td>{{ e.apellidos }} {{ e.nombres }}</td>
+                <td>{{ e.edad|default:"—" }}</td>
+                <td>{{ e.correo|default:"—" }}</td>
+                <td>{{ e.celular|default:"—" }}</td>
+                <td>{{ e.ciudad|default:"—" }}</td>
+                <td>{{ e.nivel_formacion|default:"—" }}</td>
+                <td style="font-size:12px; color:#666;">
+                    {{ e.archivado_en|date:"d/m/Y H:i" }}
+                </td>
+                <td style="font-size:12px;">
+                    {% if e.cierre %}
+                    <a href="{% url 'academia:cierre_detalle' e.cierre.pk %}" style="color:#1a237e; text-decoration:none;">
+                        {{ e.cierre.encabezado|truncatechars:40 }}
+                    </a>
+                    {% else %}
+                    <span style="color:#999;">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p style="font-size:15px;">No hay estudiantes archivados todavía.</p>
+        <p style="font-size:13px; color:#aaa;">
+            Cuando ejecutes un cierre de curso con la opción <strong>"Limpiar directorio"</strong>,
+            los estudiantes sin matrículas vivas aparecerán aquí.
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+<p style="margin-top:14px; font-size:12px; color:#888; text-align:center;">
+    🗄️ Estos registros son inmutables. Si necesitas matricular de nuevo a uno de ellos,
+    simplemente regístralo otra vez en el directorio vivo con su cédula.
+</p>
+
+{% endblock %}

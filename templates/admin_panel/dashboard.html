@@ -74,6 +74,7 @@
             <button type="submit" class="btn btn-primary btn-sm">Ver</button>
         </form>
         <a href="{% url 'academia:admin_egresos_lista' %}" class="btn btn-secondary">📒 Ver todos los egresos</a>
+        <a href="{% url 'academia:sedes_lista' %}" class="btn btn-secondary no-print" title="Administrar sedes / campus">🏢 Sedes</a>
         <a href="{% url 'academia:admin_egreso_crear' %}" class="btn btn-success">+ Nuevo egreso</a>
         <a href="{% url 'academia:admin_export_reporte' %}?anio={{ anio }}&mes={{ mes }}"
            class="btn btn-secondary no-print" title="Descargar reporte en CSV (abre con Excel)">📥 Exportar</a>
@@ -410,6 +411,126 @@
             <div style="font-size:10px; opacity:0.7; margin-top:2px;">Pendiente en comprobantes</div>
         </div>
     </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════════ #}
+{#  CIERRES DEL PERIODO + CIERRE ADMINISTRATIVO                #}
+{# ═══════════════════════════════════════════════════════════ #}
+<div style="margin-top:24px; display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+
+    {# ── Cierres de CURSO del mes ── #}
+    <div class="card-box" style="padding:22px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h3 style="font-size:16px; color:#1a237e; margin:0;">🗄️ Cierres de curso · {{ mes_nombre }} {{ anio }}</h3>
+            <a href="{% url 'academia:cierre_historial' %}" style="color:#1a237e; font-size:12px;">Ver todos →</a>
+        </div>
+
+        {% if cierres_curso_mes.count %}
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-bottom:14px;">
+                <div style="background:#e8eaf6; border-radius:8px; padding:10px;">
+                    <div style="font-size:10px; color:#666; text-transform:uppercase;">Cierres</div>
+                    <div style="font-size:20px; font-weight:700; color:#1a237e;">{{ cierres_curso_mes.count }}</div>
+                </div>
+                <div style="background:#e8f5e9; border-radius:8px; padding:10px;">
+                    <div style="font-size:10px; color:#666; text-transform:uppercase;">Cobrado</div>
+                    <div style="font-size:18px; font-weight:700; color:#2e7d32;">${{ cierres_curso_mes.total_cobrado|floatformat:2 }}</div>
+                </div>
+                <div style="background:#fff8e1; border-radius:8px; padding:10px;">
+                    <div style="font-size:10px; color:#666; text-transform:uppercase;">Matrículas</div>
+                    <div style="font-size:20px; font-weight:700; color:#856404;">{{ cierres_curso_mes.total_matriculas }}</div>
+                </div>
+            </div>
+
+            <div style="max-height:260px; overflow-y:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                    <thead>
+                        <tr style="background:#f5f5f7; color:#666;">
+                            <th style="padding:7px 10px; text-align:left;">Curso / Jornada</th>
+                            <th style="padding:7px 10px; text-align:right;">Cobrado</th>
+                            <th style="padding:7px 10px; text-align:center;">Mat.</th>
+                            <th style="padding:7px 10px; text-align:center;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in cierres_curso_mes.cierres %}
+                        <tr style="border-bottom:1px solid #f0f0f0;">
+                            <td style="padding:7px 10px;">
+                                {% if c.alcance == 'global' %}
+                                    <span style="color:#c62828; font-weight:600;">🌐 {{ c.curso_nombre }}</span>
+                                {% else %}
+                                    {{ c.curso_nombre }}
+                                {% endif %}
+                                {% if c.jornada_descripcion %}<br><small style="color:#888;">{{ c.jornada_descripcion }}</small>{% endif %}
+                            </td>
+                            <td style="padding:7px 10px; text-align:right;"><strong style="color:#2e7d32;">${{ c.total_cobrado|floatformat:2 }}</strong></td>
+                            <td style="padding:7px 10px; text-align:center;">{{ c.total_matriculas }}</td>
+                            <td style="padding:7px 10px; text-align:center;">
+                                <a href="{% url 'academia:cierre_detalle' c.pk %}" style="color:#1a237e; font-size:11px;">Ver</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p style="font-size:11px; color:#888; margin-top:10px; margin-bottom:0;">
+                💡 El dinero cobrado en estos cierres ya está sumado en los ingresos del mes (arriba), aunque las matrículas se hayan archivado.
+            </p>
+        {% else %}
+            <div style="text-align:center; color:#888; padding:30px 10px; font-size:13px;">
+                No se cerraron cursos en {{ mes_nombre }} {{ anio }}.
+            </div>
+        {% endif %}
+    </div>
+
+    {# ── Cierre administrativo (corte de caja) ── #}
+    <div class="card-box" style="padding:22px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h3 style="font-size:16px; color:#1a237e; margin:0;">🧾 Cierre administrativo</h3>
+            <a href="{% url 'academia:cierre_admin_historial' %}" style="color:#1a237e; font-size:12px;">Historial →</a>
+        </div>
+
+        <p style="font-size:13px; color:#555; margin-bottom:16px;">
+            Genera el <strong>corte de caja oficial</strong> de {{ mes_nombre }} {{ anio }}:
+            congela ingresos (incluido el dinero de cursos cerrados), egresos y balance neto.
+        </p>
+
+        {# Resumen del corte actual #}
+        <div style="background:#f9fafc; border-radius:10px; padding:16px; margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e0e0e0;">
+                <span style="font-size:13px; color:#2e7d32;">▲ Ingresos del mes</span>
+                <strong style="color:#2e7d32;">${{ ingresos.total|floatformat:2 }}</strong>
+            </div>
+            {% if ingresos.abonos_archivados > 0 %}
+            <div style="display:flex; justify-content:space-between; padding:4px 0; padding-left:14px;">
+                <span style="font-size:11px; color:#888;">↳ incluye de cursos cerrados</span>
+                <span style="font-size:11px; color:#888;">${{ ingresos.abonos_archivados|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e0e0e0;">
+                <span style="font-size:13px; color:#c62828;">▼ Egresos del mes</span>
+                <strong style="color:#c62828;">−${{ egresos_total|floatformat:2 }}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0 0;">
+                <span style="font-size:14px; font-weight:700; color:#1a237e;">= Balance neto</span>
+                <strong style="font-size:18px; color:{% if balance >= 0 %}#2e7d32{% else %}#c62828{% endif %};">
+                    {% if balance >= 0 %}+{% endif %}${{ balance|floatformat:2 }}
+                </strong>
+            </div>
+        </div>
+
+        {% if cierre_admin_existente %}
+        <div style="background:#e8f5e9; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:12px; color:#2e7d32;">
+            ✓ Ya existe un corte para este mes (guardado {{ cierre_admin_existente.fecha_cierre|date:"d/m/Y H:i" }}).
+            <a href="{% url 'academia:cierre_admin_detalle' cierre_admin_existente.pk %}" style="color:#1a237e; font-weight:600;">Ver corte →</a>
+        </div>
+        {% endif %}
+
+        <a href="{% url 'academia:cierre_admin_preview' %}?anio={{ anio }}&mes={{ mes }}"
+           class="btn" style="background:#1a237e; color:white; width:100%; text-align:center; font-weight:700;">
+            🧾 {% if cierre_admin_existente %}Actualizar{% else %}Generar{% endif %} corte de caja de {{ mes_nombre }}
+        </a>
+    </div>
+
 </div>
 
 {% endblock %}

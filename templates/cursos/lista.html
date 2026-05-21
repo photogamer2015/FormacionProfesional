@@ -59,6 +59,18 @@
         <a href="{% url 'academia:curso_crear' %}?modalidad={{ modalidad }}" class="btn btn-success">
             + Nuevo curso {{ modalidad_label|lower }}
         </a>
+        {% if es_admin %}
+        <a href="{% url 'academia:cierre_historial' %}" class="btn btn-secondary"
+           title="Ver historial de cierres realizados">
+            🗄️ Historial cierres
+        </a>
+        <a href="{% url 'academia:cierre_global_preview' modalidad=modalidad %}"
+           class="btn"
+           style="background:#FF4500; color:white; font-weight:700;"
+           title="Archivar TODAS las matrículas y pagos de todos los cursos {{ modalidad_label|lower }}, limpiando la operación viva para empezar un nuevo ciclo desde cero">
+            🔒 Cierre TOTAL ({{ modalidad_label|lower }})
+        </a>
+        {% endif %}
     </div>
     {% endif %}
 </div>
@@ -141,6 +153,14 @@
                             </a>
                             <a href="{% url 'academia:curso_editar' curso.pk %}"
                                class="btn btn-warning btn-sm">Editar</a>
+                            {% if es_admin %}
+                            <a href="{% url 'academia:cierre_preview' curso.pk %}"
+                               class="btn btn-sm"
+                               style="background:#FF4500; color:white;"
+                               title="Cerrar curso: archivar matrículas y pagos en historial">
+                                🔒 Cierre
+                            </a>
+                            {% endif %}
                             <form method="post" action="{% url 'academia:curso_eliminar' curso.pk %}"
                                   style="display:inline;"
                                   onsubmit="return false;">

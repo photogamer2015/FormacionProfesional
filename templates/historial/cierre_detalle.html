@@ -1,0 +1,399 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ cierre.encabezado }} — Detalle de cierre{% endblock %}
+
+{% block extra_head %}
+<style>
+    .payment-summary {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 140px;
+        white-space: normal;
+    }
+    .payment-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        width: fit-content;
+        max-width: 100%;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #f5f7ff;
+        color: #1a237e;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid #dfe3ff;
+    }
+    .payment-chip strong {
+        color: #2e7d32;
+        font-size: 11px;
+    }
+    .payment-empty {
+        color: #888;
+        font-size: 12px;
+    }
+    body.dark-mode .payment-chip {
+        background: #1f2a44;
+        border-color: #34446a;
+        color: #d8e2ff;
+    }
+    .jornada-cell {
+        white-space: normal;
+        min-width: 130px;
+        font-size: 12px;
+        line-height: 1.35;
+    }
+    .jornada-cell strong { color:#1a237e; }
+    .jornada-cell small { color:#666; font-size:10px; }
+
+    /* Banner archivado */
+    .archive-banner {
+        background: linear-gradient(135deg, #455a64 0%, #37474f 100%);
+        color: white;
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        display: inline-block;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+
+    /* Tarjetas-chip de filtro por estado */
+    .estado-card {
+        padding: 14px 16px;
+        border-radius: 10px;
+        background: white;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .estado-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .estado-card.is-active { box-shadow: 0 0 0 2px currentColor; }
+    body.dark-mode .estado-card { background: #2a2a2a; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:historial_lista' %}">Historial</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:cierre_historial' %}">Cursos cerrados</a> &nbsp;›&nbsp;
+    {{ cierre.curso_nombre }}
+</div>
+
+{# ─── Banner del cierre ─────────────────────────── #}
+<div style="background:linear-gradient(135deg, #1a237e 0%, #283593 100%); color:white; padding:22px 26px; border-radius:12px; margin-bottom:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+        <div>
+            <span class="archive-banner">🗄️ Cierre archivado</span>
+            <h2 style="font-size:22px; font-weight:700; margin:8px 0 4px;">{{ cierre.curso_nombre }}</h2>
+            <div style="font-size:13px; opacity:0.9; line-height:1.6;">
+                {% if cierre.jornada_descripcion %}
+                    {% if cierre.jornada_modalidad == 'online' %}🟢{% else %}🏫{% endif %}
+                    <strong>{{ cierre.jornada_descripcion }}</strong>
+                    {% if cierre.jornada_fecha_inicio %} · inicio {{ cierre.jornada_fecha_inicio|date:"d/m/Y" }}{% endif %}
+                    {% if cierre.jornada_sede %} · 📍 {{ cierre.jornada_sede }}{% endif %}
+                    · {{ cierre.get_jornada_modalidad_display }}
+                {% else %}
+                    🌐 <strong>Todo el curso</strong> (todas las jornadas)
+                {% endif %}
+                {% if cierre.curso_categoria %} · {{ cierre.curso_categoria }}{% endif %}
+                {% if cierre.ciclo_etiqueta %}
+                    <br>
+                    <span style="background:#FFD700; color:#1a237e; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:700; display:inline-block; margin-top:6px;">
+                        📅 {{ cierre.ciclo_etiqueta }}
+                    </span>
+                {% endif %}
+            </div>
+            <div style="font-size:12px; opacity:0.75; margin-top:10px;">
+                Cerrado el {{ cierre.fecha_cierre|date:"d/m/Y H:i" }}
+                {% if cierre.cerrado_por %} por {{ cierre.cerrado_por.get_full_name|default:cierre.cerrado_por.username }}{% endif %}
+            </div>
+            {% if cierre.observaciones %}
+            <div style="font-size:12px; background:rgba(255,255,255,0.1); padding:8px 12px; border-radius:8px; margin-top:10px; max-width:600px;">
+                <strong>Obs.:</strong> {{ cierre.observaciones }}
+            </div>
+            {% endif %}
+
+            {% if cierre.limpio_directorio %}
+            <div style="font-size:12px; background:rgba(255,215,0,0.15); padding:8px 12px; border-radius:8px; margin-top:10px; max-width:600px; border-left:3px solid #FFD700;">
+                🧹 <strong>En este cierre se limpió el directorio:</strong>
+                {{ cierre.total_estudiantes_archivados }} estudiante(s) archivado(s).
+                <a href="{% url 'academia:estudiantes_archivados_lista' %}?cierre={{ cierre.pk }}"
+                   style="color:#FFD700; text-decoration:underline; font-weight:600;">
+                    Ver estudiantes archivados →
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <a href="{% url 'academia:cierre_export' cierre.pk %}?estado={{ filtros.estado }}&modalidad={{ filtros.modalidad }}&sede={{ filtros.sede }}&q={{ filtros.q }}"
+               class="btn btn-success" style="background:#2e7d32; border:none;">
+                📥 Descargar Excel
+            </a>
+            <a href="{% url 'academia:cierre_historial' %}" class="btn btn-secondary"
+               style="background:rgba(255,255,255,0.15); color:white; border:1px solid rgba(255,255,255,0.3);">
+                ← Volver
+            </a>
+        </div>
+    </div>
+</div>
+
+{# ─── Tarjetas-chip de estado (clickeables para filtrar) ─────── #}
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px; margin-bottom:20px;">
+    <a href="?modalidad={{ filtros.modalidad }}&sede={{ filtros.sede }}&q={{ filtros.q }}"
+       class="estado-card {% if not filtros.estado %}is-active{% endif %}" style="border-top:4px solid #1a237e; color:#1a237e;">
+        <div style="font-size:11px; color:#666; text-transform:uppercase; letter-spacing:0.5px;">Total archivado</div>
+        <div style="font-size:24px; font-weight:700; color:#1a237e; margin-top:4px;">
+            {{ cierre.total_matriculas }}
+        </div>
+        <div style="font-size:11px; color:#888; margin-top:2px;">en este cierre</div>
+    </a>
+    <a href="?estado=Pagado&modalidad={{ filtros.modalidad }}&sede={{ filtros.sede }}&q={{ filtros.q }}"
+       class="estado-card {% if filtros.estado == 'Pagado' %}is-active{% endif %}" style="border-top:4px solid #2e7d32; color:#2e7d32;">
+        <div style="font-size:11px; color:#666; text-transform:uppercase; letter-spacing:0.5px;">✓ Pagado</div>
+        <div style="font-size:24px; font-weight:700; color:#2e7d32; margin-top:4px;">{{ cierre.conteo_pagado }}</div>
+        <div style="font-size:11px; color:#888; margin-top:2px;">estudiante(s) pagados</div>
+    </a>
+    <a href="?estado=Parcial&modalidad={{ filtros.modalidad }}&sede={{ filtros.sede }}&q={{ filtros.q }}"
+       class="estado-card {% if filtros.estado == 'Parcial' %}is-active{% endif %}" style="border-top:4px solid #f0ad4e; color:#f0ad4e;">
+        <div style="font-size:11px; color:#666; text-transform:uppercase; letter-spacing:0.5px;">◐ Parcial</div>
+        <div style="font-size:24px; font-weight:700; color:#f0ad4e; margin-top:4px;">{{ cierre.conteo_parcial }}</div>
+        <div style="font-size:11px; color:#888; margin-top:2px;">con pagos parciales</div>
+    </a>
+    <a href="?estado=Pendiente&modalidad={{ filtros.modalidad }}&sede={{ filtros.sede }}&q={{ filtros.q }}"
+       class="estado-card {% if filtros.estado == 'Pendiente' %}is-active{% endif %}" style="border-top:4px solid #c62828; color:#c62828;">
+        <div style="font-size:11px; color:#666; text-transform:uppercase; letter-spacing:0.5px;">○ Pendiente</div>
+        <div style="font-size:24px; font-weight:700; color:#c62828; margin-top:4px;">{{ cierre.conteo_pendiente }}</div>
+        <div style="font-size:11px; color:#888; margin-top:2px;">sin pagar</div>
+    </a>
+    <a href="?estado=Retiro&modalidad={{ filtros.modalidad }}&sede={{ filtros.sede }}&q={{ filtros.q }}"
+       class="estado-card {% if filtros.estado == 'Retiro' %}is-active{% endif %}" style="border-top:4px solid #757575; color:#757575;">
+        <div style="font-size:11px; color:#666; text-transform:uppercase; letter-spacing:0.5px;">Retiro voluntario</div>
+        <div style="font-size:24px; font-weight:700; color:#757575; margin-top:4px;">{{ cierre.conteo_retiro }}</div>
+        <div style="font-size:11px; color:#888; margin-top:2px;">retirado(s)</div>
+    </a>
+</div>
+
+{# ─── Totales monetarios congelados ─────────── #}
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-bottom:20px;">
+    <div class="card-box" style="background:#e8f5e9; border-left:4px solid #2e7d32;">
+        <div style="font-size:11px; color:#555; text-transform:uppercase;">Facturado total</div>
+        <div style="font-size:22px; font-weight:700; color:#2e7d32; margin-top:4px;">
+            ${{ cierre.total_facturado|floatformat:2 }}
+        </div>
+    </div>
+    <div class="card-box" style="background:#e3f2fd; border-left:4px solid #0d47a1;">
+        <div style="font-size:11px; color:#555; text-transform:uppercase;">Cobrado total</div>
+        <div style="font-size:22px; font-weight:700; color:#0d47a1; margin-top:4px;">
+            ${{ cierre.total_cobrado|floatformat:2 }}
+        </div>
+    </div>
+    <div class="card-box" style="background:#ffebee; border-left:4px solid #c62828;">
+        <div style="font-size:11px; color:#555; text-transform:uppercase;">Saldo pendiente</div>
+        <div style="font-size:22px; font-weight:700; color:#c62828; margin-top:4px;">
+            ${{ cierre.total_pendiente|floatformat:2 }}
+        </div>
+    </div>
+    <div class="card-box" style="background:#fff8e1; border-left:4px solid #f0ad4e;">
+        <div style="font-size:11px; color:#555; text-transform:uppercase;">En este filtro</div>
+        <div style="font-size:22px; font-weight:700; color:#856404; margin-top:4px;">
+            {{ totales_filtrados.total_matriculas }} matr.
+        </div>
+        <div style="font-size:11px; color:#888;">${{ totales_filtrados.total_cobrado|floatformat:2 }} cobrado</div>
+    </div>
+</div>
+
+{# ─── Filtros ─────────────────────── #}
+<div class="card-box" style="margin-bottom:20px; padding:16px;">
+    <form method="get" style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap:10px; align-items:end;">
+        <div>
+            <label class="form-label" style="font-size:11px;">Buscar</label>
+            <input type="text" name="q" value="{{ filtros.q }}"
+                   placeholder="Cédula, nombre, correo, celular, jornada…"
+                   class="form-input">
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Estado de pago</label>
+            <select name="estado" class="form-input">
+                <option value="">— Todos —</option>
+                <option value="Pagado" {% if filtros.estado == 'Pagado' %}selected{% endif %}>Pagado</option>
+                <option value="Parcial" {% if filtros.estado == 'Parcial' %}selected{% endif %}>Parcial</option>
+                <option value="Pendiente" {% if filtros.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+                <option value="Retiro" {% if filtros.estado == 'Retiro' %}selected{% endif %}>Retiro voluntario</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Modalidad</label>
+            <select name="modalidad" class="form-input">
+                <option value="">— Todas —</option>
+                <option value="presencial" {% if filtros.modalidad == 'presencial' %}selected{% endif %}>Presencial</option>
+                <option value="online" {% if filtros.modalidad == 'online' %}selected{% endif %}>Online</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Sede</label>
+            <select name="sede" class="form-input">
+                <option value="">— Todas —</option>
+                {% for s in sedes_disponibles %}
+                    <option value="{{ s }}" {% if filtros.sede == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a href="{% url 'academia:cierre_detalle' cierre.pk %}" class="btn btn-secondary">Limpiar</a>
+        </div>
+    </form>
+
+    {% if filtros.q or filtros.estado or filtros.modalidad or filtros.sede %}
+    <p style="font-size:12px; color:#666; margin-top:12px; margin-bottom:0;">
+        🔍 Mostrando <strong>{{ matriculas|length }}</strong> matrícula(s) que cumplen el filtro
+        {% if filtros.q %} · búsqueda: "<em>{{ filtros.q }}</em>"{% endif %}
+        {% if filtros.estado %} · estado: <strong>{{ filtros.estado }}</strong>{% endif %}
+        {% if filtros.modalidad %} · {{ filtros.modalidad|title }}{% endif %}
+        {% if filtros.sede %} · sede: {{ filtros.sede }}{% endif %}
+    </p>
+    {% endif %}
+</div>
+
+{# ─── Tabla principal (mismo look que pagos/lista.html) ─────────── #}
+<div class="table-wrap">
+    {% if matriculas %}
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha matr.</th>
+                <th>Cédula</th>
+                <th>Estudiante</th>
+                <th>Contacto</th>
+                <th>Curso</th>
+                <th>Modalidad</th>
+                <th>Jornada</th>
+                <th>Sede</th>
+                <th>Día inicio</th>
+                <th>Valor curso</th>
+                <th>Descuento</th>
+                <th>Pagado</th>
+                <th>Tipo de pago</th>
+                <th>Método</th>
+                <th>Saldo</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in matriculas %}
+            <tr>
+                <td>{{ m.fecha_matricula|date:"d/m/Y" }}</td>
+                <td><strong>{{ m.cedula }}</strong></td>
+                <td>
+                    {{ m.apellidos }} {{ m.nombres }}
+                    {% if m.edad %}<br><small style="color:#888;">{{ m.edad }} años</small>{% endif %}
+                </td>
+                <td class="jornada-cell">
+                    {% if m.correo %}<div><small>📧 {{ m.correo }}</small></div>{% endif %}
+                    {% if m.celular %}<div><small>📱 {{ m.celular }}</small></div>{% endif %}
+                </td>
+                <td>
+                    {{ m.curso_nombre }}
+                    {% if m.curso_categoria %}<br><small style="color:#888;">{{ m.curso_categoria }}</small>{% endif %}
+                </td>
+                <td>
+                    <span class="badge badge-{{ m.modalidad }}">
+                        {% if m.modalidad == 'online' %}🟢{% else %}🏫{% endif %}
+                        {{ m.get_modalidad_display }}
+                    </span>
+                </td>
+                <td class="jornada-cell">
+                    {% if m.jornada_descripcion %}
+                        <strong>{{ m.jornada_descripcion }}</strong>
+                        {% if m.jornada_horario %}<div><small>{{ m.jornada_horario }}</small></div>{% endif %}
+                    {% else %}
+                        <span style="color:#999;">—</span>
+                    {% endif %}
+                </td>
+                <td>{{ m.sede|default:"—" }}</td>
+                <td class="jornada-cell" style="text-align:center;">
+                    {% if m.jornada_fecha_inicio %}
+                        <strong>{{ m.jornada_fecha_inicio|date:"d/m/Y" }}</strong>
+                    {% else %}
+                        <span style="color:#999;">—</span>
+                    {% endif %}
+                </td>
+                <td>${{ m.valor_curso|floatformat:2 }}</td>
+                <td>
+                    {% if m.descuento > 0 %}
+                        <span style="color:#c62828;">−${{ m.descuento|floatformat:2 }}</span>
+                    {% else %}
+                        <span style="color:#999;">—</span>
+                    {% endif %}
+                </td>
+                <td><strong style="color:#2e7d32;">${{ m.valor_pagado|floatformat:2 }}</strong></td>
+                <td>
+                    <div class="payment-summary">
+                        {% for a in m.abonos_archivados.all %}
+                            {% if a.tipo_pago_label %}
+                            <span class="payment-chip">
+                                {{ a.tipo_pago_label }}{% if not a.cuenta_para_saldo %} (aparte){% endif %}
+                                <strong>${{ a.monto|floatformat:2 }}</strong>
+                            </span>
+                            {% endif %}
+                        {% empty %}
+                            <span class="payment-empty">Sin pagos</span>
+                        {% endfor %}
+                    </div>
+                </td>
+                <td>
+                    <div class="payment-summary">
+                        {% for a in m.abonos_archivados.all %}
+                            {% if a.metodo_label %}
+                            <span class="payment-chip">
+                                {{ a.metodo_label }}{% if a.banco_label %} · {{ a.banco_label }}{% endif %}
+                                <strong>${{ a.monto|floatformat:2 }}</strong>
+                            </span>
+                            {% endif %}
+                        {% empty %}
+                            <span class="payment-empty">—</span>
+                        {% endfor %}
+                    </div>
+                </td>
+                <td>
+                    <strong style="color:{% if m.saldo > 0 %}#c62828{% else %}#2e7d32{% endif %};">
+                        ${{ m.saldo|floatformat:2 }}
+                    </strong>
+                </td>
+                <td>
+                    {% if m.estado_pago == 'Retiro' %}
+                        <span class="badge" style="background:#f5f5f5; color:#616161; border:1px solid #e0e0e0;">Retiro</span>
+                    {% elif m.estado_pago == 'Pagado' %}
+                        <span class="badge badge-pagado">✓ Pagado</span>
+                    {% elif m.estado_pago == 'Parcial' %}
+                        <span class="badge badge-parcial">◐ Parcial</span>
+                    {% else %}
+                        <span class="badge badge-pendiente">○ Pendiente</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <div class="empty-state">
+            <p style="font-size:15px;">No hay matrículas archivadas que cumplan los filtros.</p>
+            <a href="{% url 'academia:cierre_detalle' cierre.pk %}" class="btn btn-secondary" style="margin-top:12px;">Limpiar filtros</a>
+        </div>
+    {% endif %}
+</div>
+
+<p style="margin-top:16px; font-size:12px; color:#888; text-align:center;">
+    🗄️ Este detalle es un snapshot inmutable. Los datos quedaron congelados al momento del cierre
+    ({{ cierre.fecha_cierre|date:"d/m/Y H:i" }}). Cambios posteriores en cursos, estudiantes o jornadas no afectan este registro.
+</p>
+
+{% endblock %}
