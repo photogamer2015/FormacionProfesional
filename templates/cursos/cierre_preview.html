@@ -180,6 +180,35 @@
         {% csrf_token %}
         {% if jornada %}<input type="hidden" name="jornada_id" value="{{ jornada.pk }}">{% endif %}
 
+        <div style="background:#e8eaf6; border-left:4px solid #1a237e; padding:14px 16px; border-radius:8px; margin-bottom:14px;">
+            <div style="display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; align-items:flex-end;">
+                <div style="flex:1; min-width:260px;">
+                    <strong style="color:#1a237e;">📅 Mes donde se guardará en Archivo</strong>
+                    <div style="font-size:12px; color:#666; margin-top:4px;">
+                        Elige manualmente el mes del ciclo. Los estudiantes, matrículas, pagos y adicionales archivados aparecerán en ese mes.
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <div>
+                        <label class="form-label" style="font-size:11px;">Mes archivo</label>
+                        <select name="archivo_mes" class="form-input" required>
+                            {% for m in archivo_opts.meses %}
+                            <option value="{{ m.numero }}" {% if m.numero == archivo_opts.mes_actual %}selected{% endif %}>{{ m.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" style="font-size:11px;">Año archivo</label>
+                        <select name="archivo_anio" class="form-input" required>
+                            {% for a in archivo_opts.anios %}
+                            <option value="{{ a }}" {% if a == archivo_opts.anio_actual %}selected{% endif %}>{{ a }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:14px;">
             <div>
                 <label class="form-label">Etiqueta del ciclo (opcional)</label>

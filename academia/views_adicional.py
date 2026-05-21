@@ -330,9 +330,10 @@ def adicional_cierre(request):
             messages.warning(request, 'No hay adicionales activos para cerrar.')
             return redirect('academia:adicional_lista')
 
-        from .views_cierre import _snapshot_adicional
+        from .views_cierre import _fecha_archivo_desde_request, _snapshot_adicional
+        fecha_archivo = _fecha_archivo_desde_request(request)
         for ad in adicionales:
-            _snapshot_adicional(ad, None)
+            _snapshot_adicional(ad, None, fecha_archivo)
         Adicional.objects.filter(pk__in=[ad.pk for ad in adicionales]).delete()
 
         messages.success(
@@ -343,6 +344,7 @@ def adicional_cierre(request):
             return redirect(f'{reverse("academia:adicionales_archivados_lista")}?origen={origen}')
         return redirect('academia:adicionales_archivados_lista')
 
+    from .views_cierre import _opciones_meses_archivo
     return render(request, 'adicional/cierre_confirmar.html', {
         'titulo': titulo,
         'origen': origen,
@@ -351,6 +353,7 @@ def adicional_cierre(request):
         'total_valor': total_valor,
         'desglose_tipos': desglose_tipos,
         'adicionales': qs.order_by('-fecha', '-creado')[:80],
+        'archivo_opts': _opciones_meses_archivo(),
     })
 
 

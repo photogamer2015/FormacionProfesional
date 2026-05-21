@@ -42,6 +42,46 @@ MESES_ES = [
 # Helpers
 # ═════════════════════════════════════════════════════════════════
 
+def _opciones_meses_archivo():
+    """Opciones de meses para elegir manualmente dónde guardar el cierre."""
+    hoy = timezone.localdate()
+    return {
+        'anio_actual': hoy.year,
+        'mes_actual': hoy.month,
+        'anios': [hoy.year - 1, hoy.year, hoy.year + 1],
+        'meses': [{'numero': i, 'nombre': MESES_ES[i]} for i in range(1, 13)],
+    }
+
+
+def _fecha_archivo_desde_request(request):
+    """
+    Convierte el mes/año elegido en una fecha de archivo estable.
+    Usamos el primer día del mes a las 12:00 para que todos los filtros por
+    mes/año agrupen el cierre donde el usuario lo decidió, no donde caiga
+    el reloj del sistema.
+    """
+    hoy = timezone.localdate()
+    try:
+        anio = int(request.POST.get('archivo_anio', hoy.year))
+        mes = int(request.POST.get('archivo_mes', hoy.month))
+        if not (1 <= mes <= 12):
+            raise ValueError
+    except (TypeError, ValueError):
+        anio, mes = hoy.year, hoy.month
+
+    fecha = datetime(anio, mes, 1, 12, 0, 0)
+    if timezone.is_naive(fecha):
+        fecha = timezone.make_aware(fecha, timezone.get_current_timezone())
+    return fecha
+
+
+def _fijar_fecha(obj, campo, fecha_archivo):
+    if not fecha_archivo:
+        return obj
+    obj.__class__.objects.filter(pk=obj.pk).update(**{campo: fecha_archivo})
+    setattr(obj, campo, fecha_archivo)
+    return obj
+
 def _matriculas_a_cerrar(curso, jornada=None):
     """
     Devuelve la queryset de matrículas que se incluirán en el cierre.
@@ -115,7 +155,7 @@ def _calcular_totales(matriculas):
     }
 
 
-def _snapshot_matricula(matricula, cierre):
+def _snapshot_matricula(matricula, cierre, fecha_archivo=None):
     """Crea una MatriculaArchivada a partir de una Matricula viva."""
     est = matricula.estudiante
     curso = matricula.curso
@@ -178,9 +218,11 @@ def _snapshot_matricula(matricula, cierre):
         creado_original=matricula.creado,
     )
 
+    _fijar_fecha(archivada, 'archivado_en', fecha_archivo)
+
     # Archivar abonos
     for abono in matricula.abonos.all():
-        AbonoArchivado.objects.create(
+        abono_arch = AbonoArchivado.objects.create(
             matricula_archivada=archivada,
             cierre=cierre,
             abono_original_id=abono.pk,
@@ -202,13 +244,14 @@ def _snapshot_matricula(matricula, cierre):
             ),
             creado_original=abono.creado,
         )
+        _fijar_fecha(abono_arch, 'archivado_en', fecha_archivo)
 
     return archivada
 
 
-def _snapshot_estudiante(estudiante, cierre):
+def _snapshot_estudiante(estudiante, cierre, fecha_archivo=None):
     """Crea un EstudianteArchivado a partir de un Estudiante vivo (snapshot)."""
-    return EstudianteArchivado.objects.create(
+    archivado = EstudianteArchivado.objects.create(
         cierre=cierre,
         estudiante_original_id=estudiante.pk,
         cedula=estudiante.cedula,
@@ -224,12 +267,13 @@ def _snapshot_estudiante(estudiante, cierre):
         ciudad=estudiante.ciudad or '',
         creado_original=estudiante.creado,
     )
+    return _fijar_fecha(archivado, 'archivado_en', fecha_archivo)
 
 
-def _snapshot_adicional(adicional, cierre):
+def _snapshot_adicional(adicional, cierre, fecha_archivo=None):
     """Crea un AdicionalArchivado a partir de un Adicional vivo."""
     from .models import AdicionalArchivado
-    return AdicionalArchivado.objects.create(
+    archivado = AdicionalArchivado.objects.create(
         cierre=cierre,
         adicional_original_id=adicional.pk,
         tipo_adicional=adicional.tipo_adicional,
@@ -256,6 +300,7 @@ def _snapshot_adicional(adicional, cierre):
         ),
         creado_original=adicional.creado,
     )
+    return _fijar_fecha(archivado, 'archivado_en', fecha_archivo)
 
 # ═════════════════════════════════════════════════════════════════
 # Vista previa del cierre
@@ -289,6 +334,7 @@ def cierre_preview(request, curso_pk):
         'totales': totales,
         'total_abonos': total_abonos,
         'alcance': 'jornada' if jornada else 'curso',
+        'archivo_opts': _opciones_meses_archivo(),
     })
 
 
@@ -308,6 +354,7 @@ def cierre_ejecutar(request, curso_pk):
     ciclo_etiqueta = (request.POST.get('ciclo_etiqueta', '').strip())[:80]
     observaciones = request.POST.get('observaciones', '').strip()
     limpiar_directorio = request.POST.get('limpiar_directorio') == 'on'
+    fecha_archivo = _fecha_archivo_desde_request(request)
 
     jornada = None
     if jornada_id.isdigit():
@@ -347,10 +394,11 @@ def cierre_ejecutar(request, curso_pk):
                 **{k: v for k, v in totales.items() if k != 'total_matriculas'},
                 total_matriculas=totales['total_matriculas'],
             )
+            _fijar_fecha(cierre, 'fecha_cierre', fecha_archivo)
 
             ids_a_borrar = []
             for m in matriculas:
-                _snapshot_matricula(m, cierre)
+                _snapshot_matricula(m, cierre, fecha_archivo)
                 ids_a_borrar.append(m.pk)
 
             Matricula.objects.filter(pk__in=ids_a_borrar).delete()
@@ -358,7 +406,7 @@ def cierre_ejecutar(request, curso_pk):
             if not jornada:
                 adicionales_curso = Adicional.objects.filter(curso=curso)
                 for ad in adicionales_curso:
-                    _snapshot_adicional(ad, cierre)
+                    _snapshot_adicional(ad, cierre, fecha_archivo)
                 adicionales_curso.delete()
 
             # ── Limpieza opcional del directorio de estudiantes ──
@@ -371,10 +419,10 @@ def cierre_ejecutar(request, curso_pk):
                 ).distinct()
 
                 for est in huerfanos:
-                    _snapshot_estudiante(est, cierre)
+                    _snapshot_estudiante(est, cierre, fecha_archivo)
                     # Archivar también sus adicionales sueltos
                     for ad in est.adicionales.all():
-                        _snapshot_adicional(ad, cierre)
+                        _snapshot_adicional(ad, cierre, fecha_archivo)
                         ad.delete()
                     estudiantes_archivados += 1
 
@@ -476,6 +524,7 @@ def cierre_global_preview(request, modalidad):
         'cursos_distintos': cursos_distintos,
         'totales': totales,
         'total_abonos': total_abonos,
+        'archivo_opts': _opciones_meses_archivo(),
     })
 
 
@@ -495,6 +544,7 @@ def cierre_global_ejecutar(request, modalidad):
     ciclo_etiqueta = (request.POST.get('ciclo_etiqueta', '').strip())[:80]
     observaciones = request.POST.get('observaciones', '').strip()
     limpiar_directorio = request.POST.get('limpiar_directorio') == 'on'
+    fecha_archivo = _fecha_archivo_desde_request(request)
 
     qs = Matricula.objects.select_related(
         'estudiante', 'curso', 'curso__categoria', 'jornada', 'registrado_por'
@@ -545,19 +595,20 @@ def cierre_global_ejecutar(request, modalidad):
                     conteo_pendiente=totales['conteo_pendiente'],
                     conteo_retiro=totales['conteo_retiro'],
                 )
+                _fijar_fecha(cierre, 'fecha_cierre', fecha_archivo)
                 cierres_creados.append(cierre)
                 total_archivado += len(matriculas_curso)
 
                 ids = []
                 for m in matriculas_curso:
-                    _snapshot_matricula(m, cierre)
+                    _snapshot_matricula(m, cierre, fecha_archivo)
                     ids.append(m.pk)
                 Matricula.objects.filter(pk__in=ids).delete()
 
                 # Cierre global es de todo el curso, archivamos sus adicionales
                 adicionales_curso = Adicional.objects.filter(curso=curso)
                 for ad in adicionales_curso:
-                    _snapshot_adicional(ad, cierre)
+                    _snapshot_adicional(ad, cierre, fecha_archivo)
                 adicionales_curso.delete()
 
             # ── Limpieza del directorio ──
@@ -570,10 +621,10 @@ def cierre_global_ejecutar(request, modalidad):
                 # Asignamos los snapshots al primer cierre creado (a modo de "ancla")
                 cierre_ancla = cierres_creados[0]
                 for est in huerfanos:
-                    _snapshot_estudiante(est, cierre_ancla)
+                    _snapshot_estudiante(est, cierre_ancla, fecha_archivo)
                     # Archivar también sus adicionales sueltos
                     for ad in est.adicionales.all():
-                        _snapshot_adicional(ad, cierre_ancla)
+                        _snapshot_adicional(ad, cierre_ancla, fecha_archivo)
                         ad.delete()
                     estudiantes_archivados_total += 1
                 huerfanos.delete()
