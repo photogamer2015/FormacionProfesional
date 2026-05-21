@@ -28,9 +28,17 @@
             {% endif %}
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <a href="{% url 'academia:cierre_admin_preview' %}?anio={{ cierre.anio }}&mes={{ cierre.mes }}"
+            <a href="{% url 'academia:cierre_admin_export_excel' cierre.pk %}"
+               class="btn" style="background:#2e7d32; color:white; border:1px solid rgba(255,255,255,0.2);">
+                📥 Excel
+            </a>
+            <a href="{% url 'academia:cierre_admin_export_pdf' cierre.pk %}"
+               class="btn" style="background:#c62828; color:white; border:1px solid rgba(255,255,255,0.2);">
+                📄 PDF
+            </a>
+            <a href="{% url 'academia:cierre_admin_historial' %}?anio={{ cierre.anio }}&mes={{ cierre.mes }}"
                class="btn" style="background:rgba(255,255,255,0.15); color:white; border:1px solid rgba(255,255,255,0.3);">
-                🔄 Actualizar corte
+                🗄️ Archivado
             </a>
             <form method="post" action="{% url 'academia:cierre_admin_eliminar' cierre.pk %}" style="display:inline;" onsubmit="return false;">
                 {% csrf_token %}

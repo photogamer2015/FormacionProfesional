@@ -32,12 +32,13 @@
 </div>
 
 {% if existente %}
-<div style="background:#fff8e1; border-left:4px solid #f0ad4e; padding:14px 18px; border-radius:8px; margin-bottom:20px;">
-    <strong style="color:#856404;">⚠️ Ya existe un corte para {{ mes_nombre }} {{ anio }}</strong>
+<div style="background:#e8f5e9; border-left:4px solid #2e7d32; padding:14px 18px; border-radius:8px; margin-bottom:20px;">
+    <strong style="color:#2e7d32;">✓ Corte archivado para {{ mes_nombre }} {{ anio }}</strong>
     <p style="font-size:13px; color:#666; margin:6px 0 0;">
-        Guardado el {{ existente.fecha_cierre|date:"d/m/Y H:i" }}. Si vuelves a generar,
-        se <strong>actualizará</strong> con los datos actuales.
-        <a href="{% url 'academia:cierre_admin_detalle' existente.pk %}" style="color:#1a237e; font-weight:600;">Ver corte actual →</a>
+        Hay {{ cortes_existentes_count }} corte{{ cortes_existentes_count|pluralize }} archivado{{ cortes_existentes_count|pluralize }} para este mes.
+        El último se guardó el {{ existente.fecha_cierre|date:"d/m/Y H:i" }}.
+        Si necesitas otro corte manual, se guardará como un registro nuevo sin sobrescribir los anteriores.
+        <a href="{% url 'academia:cierre_admin_detalle' existente.pk %}" style="color:#1a237e; font-weight:600;">Ver corte archivado →</a>
     </p>
 </div>
 {% endif %}
@@ -159,8 +160,20 @@
 {% endif %}
 
 {# ─── Confirmación ──────────── #}
+{% if not tiene_valores_corte %}
+<div class="card-box" style="border:2px solid #f0ad4e; padding:22px;">
+    <h3 style="color:#856404; font-size:16px; margin-bottom:12px;">Sin valores para cortar</h3>
+    <div style="background:#f9fafc; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:12px; color:#666;">
+        No se puede guardar un corte de {{ mes_nombre }} {{ anio }} porque este mes no tiene ingresos ni egresos.
+        Selecciona un mes con valores o registra primero los movimientos correspondientes.
+    </div>
+    <a href="{% url 'academia:cierre_admin_historial' %}?anio={{ anio }}&mes={{ mes }}" class="btn btn-secondary">Historial</a>
+</div>
+{% else %}
 <div class="card-box" style="border:2px solid #1a237e; padding:22px;">
-    <h3 style="color:#1a237e; font-size:16px; margin-bottom:12px;">Guardar corte de caja</h3>
+    <h3 style="color:#1a237e; font-size:16px; margin-bottom:12px;">
+        {% if existente %}Guardar nuevo corte manual{% else %}Guardar corte de caja{% endif %}
+    </h3>
     <form method="post" action="{% url 'academia:cierre_admin_ejecutar' %}">
         {% csrf_token %}
         <input type="hidden" name="anio" value="{{ anio }}">
@@ -182,14 +195,20 @@
         <div style="background:#f9fafc; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:12px; color:#666;">
             ℹ️ El cierre administrativo <strong>no borra nada</strong>. Solo fotografía los totales
             del mes para tener un corte oficial. Los egresos y registros siguen intactos.
-            Si ya hay un corte de este mes, se actualiza.
+            {% if existente %}
+            Como ya existe un corte de este mes, este se guardará como <strong>otro corte manual</strong>,
+            sin actualizar ni reemplazar el anterior.
+            {% else %}
+            Cuando queda archivado, no se sobrescribe.
+            {% endif %}
         </div>
 
         <button type="submit" class="btn" style="background:#1a237e; color:white; font-weight:700; font-size:14px;">
-            🧾 Guardar corte de {{ mes_nombre }} {{ anio }}
+            🧾 {% if existente %}Guardar otro corte de {{ mes_nombre }} {{ anio }}{% else %}Guardar corte de {{ mes_nombre }} {{ anio }}{% endif %}
         </button>
         <a href="{% url 'academia:admin_dashboard' %}?anio={{ anio }}&mes={{ mes }}" class="btn btn-secondary">Cancelar</a>
     </form>
 </div>
+{% endif %}
 
 {% endblock %}

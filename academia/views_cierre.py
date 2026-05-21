@@ -293,6 +293,11 @@ def _snapshot_adicional(adicional, cierre, fecha_archivo=None):
         banco=adicional.banco,
         banco_label=adicional.get_banco_display() if hasattr(adicional, 'get_banco_display') and adicional.banco else '',
         numero_recibo=adicional.numero_recibo,
+        factura_realizada=adicional.factura_realizada or 'no',
+        fact_nombres=adicional.fact_nombres or '',
+        fact_apellidos=adicional.fact_apellidos or '',
+        fact_cedula=adicional.fact_cedula or '',
+        fact_correo=adicional.fact_correo or '',
         observaciones=adicional.observaciones,
         registrado_por_nombre=(
             adicional.registrado_por.get_full_name() or adicional.registrado_por.username

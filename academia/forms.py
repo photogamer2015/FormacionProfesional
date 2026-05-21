@@ -878,6 +878,8 @@ class _AdicionalBaseForm(forms.ModelForm):
             'numero_modulo',
             'fecha', 'valor', 'metodo_pago', 'banco',
             'numero_recibo',
+            'factura_realizada',
+            'fact_nombres', 'fact_apellidos', 'fact_cedula', 'fact_correo',
             'observaciones',
         ]
         widgets = {
@@ -904,6 +906,26 @@ class _AdicionalBaseForm(forms.ModelForm):
                 'class': 'form-input',
                 'placeholder': 'Se genera automáticamente si lo dejas vacío',
             }),
+            'factura_realizada': forms.Select(attrs={
+                'class': 'form-input',
+                'id': 'id_factura_realizada',
+            }),
+            'fact_nombres': forms.TextInput(attrs={
+                'class': 'form-input',
+                'placeholder': 'Nombres del titular de factura',
+            }),
+            'fact_apellidos': forms.TextInput(attrs={
+                'class': 'form-input',
+                'placeholder': 'Apellidos del titular de factura',
+            }),
+            'fact_cedula': forms.TextInput(attrs={
+                'class': 'form-input',
+                'placeholder': 'Cédula / RUC',
+            }),
+            'fact_correo': forms.EmailInput(attrs={
+                'class': 'form-input',
+                'placeholder': 'correo@ejemplo.com',
+            }),
             'observaciones': forms.Textarea(attrs={
                 'class': 'form-input', 'rows': 2,
             }),
@@ -919,6 +941,11 @@ class _AdicionalBaseForm(forms.ModelForm):
             'metodo_pago': 'Método de pago *',
             'banco': 'Banco',
             'numero_recibo': 'Nº de recibo',
+            'factura_realizada': '¿Factura realizada? *',
+            'fact_nombres': 'Nombres',
+            'fact_apellidos': 'Apellidos',
+            'fact_cedula': 'Número de cédula / RUC',
+            'fact_correo': 'Correo electrónico',
             'observaciones': 'Observaciones',
         }
 
@@ -945,6 +972,9 @@ class _AdicionalBaseForm(forms.ModelForm):
         self.fields['banco'].required = False
         self.fields['banco'].empty_label = '— Selecciona un banco —'
         self.fields['numero_recibo'].required = False
+        self.fields['factura_realizada'].required = True
+        for fname in ('fact_nombres', 'fact_apellidos', 'fact_cedula', 'fact_correo'):
+            self.fields[fname].required = False
         self.fields['observaciones'].required = False
 
     def clean(self):
@@ -955,6 +985,7 @@ class _AdicionalBaseForm(forms.ModelForm):
         talla = cleaned.get('talla_camiseta')
         metodo = cleaned.get('metodo_pago')
         banco = cleaned.get('banco')
+        factura = cleaned.get('factura_realizada')
 
         # Validación de banco según método
         if metodo == 'transferencia' and not banco:
@@ -974,6 +1005,24 @@ class _AdicionalBaseForm(forms.ModelForm):
         if tipo == 'camisa':
             if not talla:
                 self.add_error('talla_camiseta', 'Selecciona la talla de la camisa.')
+
+        if factura == 'si':
+            faltantes = []
+            for fname, label in (
+                ('fact_nombres', 'Nombres'),
+                ('fact_apellidos', 'Apellidos'),
+                ('fact_cedula', 'Cédula / RUC'),
+                ('fact_correo', 'Correo'),
+            ):
+                if not cleaned.get(fname):
+                    self.add_error(fname, 'Este dato es obligatorio cuando la factura está realizada.')
+                    faltantes.append(label)
+            if faltantes:
+                self.add_error(
+                    None,
+                    'Si marcas "Factura realizada = Sí", debes llenar los datos de factura: '
+                    + ', '.join(faltantes) + '.'
+                )
 
         return cleaned
 

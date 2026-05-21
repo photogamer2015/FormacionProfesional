@@ -12,10 +12,13 @@ import calendar
 import json
 from datetime import date, timedelta
 from decimal import Decimal
+from io import BytesIO
 
 from django.contrib import messages
 from django.db.models import Count, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.text import slugify
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -488,7 +491,8 @@ def admin_dashboard(request):
     # ¿Ya existe un cierre administrativo para este mes?
     cierre_admin_existente = CierreAdministrativo.objects.filter(
         anio=anio, mes=mes
-    ).first()
+    ).order_by('-fecha_cierre').first()
+    tiene_valores_corte = ingresos['total'] != Decimal('0.00') or egresos_total != Decimal('0.00')
 
     return render(request, 'admin_panel/dashboard.html', {
         'anio': anio,
@@ -532,6 +536,7 @@ def admin_dashboard(request):
         'cierres_curso_mes': cierres_curso_mes,
         'cierres_admin': cierres_admin,
         'cierre_admin_existente': cierre_admin_existente,
+        'tiene_valores_corte': tiene_valores_corte,
         # Gráfico (JSON serializable)
         'serie_meses_json': json.dumps(serie_meses),
     })
@@ -632,7 +637,6 @@ def egreso_eliminar(request, pk):
 # ─────────────────────────────────────────────────────────
 
 import csv
-from django.http import HttpResponse
 
 
 def _csv_response(filename):
@@ -866,7 +870,11 @@ def cierre_admin_preview(request):
     cierres_curso = _cierres_curso_periodo(desde, hasta)
     balance = ingresos['total'] - egresos_total
 
-    existente = CierreAdministrativo.objects.filter(anio=anio, mes=mes).first()
+    existente = CierreAdministrativo.objects.filter(
+        anio=anio, mes=mes
+    ).order_by('-fecha_cierre').first()
+    cortes_existentes_count = CierreAdministrativo.objects.filter(anio=anio, mes=mes).count()
+    tiene_valores_corte = ingresos['total'] != Decimal('0.00') or egresos_total != Decimal('0.00')
 
     meses_selector = []
     for i in range(0, 24):
@@ -893,6 +901,8 @@ def cierre_admin_preview(request):
         'cierres_curso': cierres_curso,
         'balance': balance,
         'existente': existente,
+        'cortes_existentes_count': cortes_existentes_count,
+        'tiene_valores_corte': tiene_valores_corte,
         'meses_selector': meses_selector,
     })
 
@@ -920,6 +930,13 @@ def cierre_admin_ejecutar(request):
     cierres_curso = _cierres_curso_periodo(desde, hasta)
     balance = ingresos['total'] - egresos_total
 
+    if ingresos['total'] == Decimal('0.00') and egresos_total == Decimal('0.00'):
+        messages.warning(
+            request,
+            f'No se creó el corte de {MESES_ES[mes]} {anio} porque ese mes no tiene ingresos ni egresos.'
+        )
+        return redirect(f'/admin-panel/cierre/?anio={anio}&mes={mes}')
+
     # Serializar el desglose de egresos por categoría
     egresos_detalle = [
         {
@@ -931,26 +948,23 @@ def cierre_admin_ejecutar(request):
         for e in egresos_categorias
     ]
 
-    # Si ya existe un cierre para este mes, lo actualizamos (re-corte)
-    cierre, _creado = CierreAdministrativo.objects.update_or_create(
+    cierre = CierreAdministrativo.objects.create(
         anio=anio, mes=mes,
-        defaults={
-            'etiqueta': etiqueta,
-            'fecha_desde': desde,
-            'fecha_hasta': hasta,
-            'ingreso_abonos': ingresos['abonos'],
-            'ingreso_abonos_archivados': ingresos['abonos_archivados'],
-            'ingreso_ventas': ingresos['ventas'],
-            'ingreso_adicionales': ingresos['adicionales'],
-            'ingreso_total': ingresos['total'],
-            'egreso_total': egresos_total,
-            'egresos_detalle_json': json.dumps(egresos_detalle),
-            'balance_neto': balance,
-            'cierres_curso_incluidos': cierres_curso['count'],
-            'monto_cierres_curso': cierres_curso['total_cobrado'],
-            'observaciones': observaciones,
-            'cerrado_por': request.user if request.user.is_authenticated else None,
-        }
+        etiqueta=etiqueta,
+        fecha_desde=desde,
+        fecha_hasta=hasta,
+        ingreso_abonos=ingresos['abonos'],
+        ingreso_abonos_archivados=ingresos['abonos_archivados'],
+        ingreso_ventas=ingresos['ventas'],
+        ingreso_adicionales=ingresos['adicionales'],
+        ingreso_total=ingresos['total'],
+        egreso_total=egresos_total,
+        egresos_detalle_json=json.dumps(egresos_detalle),
+        balance_neto=balance,
+        cierres_curso_incluidos=cierres_curso['count'],
+        monto_cierres_curso=cierres_curso['total_cobrado'],
+        observaciones=observaciones,
+        cerrado_por=request.user if request.user.is_authenticated else None,
     )
 
     messages.success(
@@ -1017,6 +1031,236 @@ def cierre_admin_detalle(request, pk):
         'egresos_detalle': egresos_detalle,
         'cierres_curso': cierres_curso,
     })
+
+
+def _cierre_admin_egresos_detalle(cierre):
+    if not cierre.egresos_detalle_json:
+        return []
+    try:
+        data = json.loads(cierre.egresos_detalle_json)
+    except (ValueError, TypeError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _cierre_admin_filename(cierre, extension):
+    base = slugify(cierre.encabezado) or f'corte_{cierre.anio}_{cierre.mes or 0:02d}'
+    return f'{base}_{cierre.fecha_cierre.strftime("%Y%m%d")}.{extension}'
+
+
+@admin_requerido
+def cierre_admin_export_excel(request, pk):
+    """Exporta el corte administrativo congelado como Excel."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    cierre = get_object_or_404(CierreAdministrativo, pk=pk)
+    egresos_detalle = _cierre_admin_egresos_detalle(cierre)
+    cierres_curso = _cierres_curso_periodo(cierre.fecha_desde, cierre.fecha_hasta)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Resumen'
+
+    header_fill = PatternFill('solid', fgColor='1A237E')
+    header_font = Font(bold=True, color='FFFFFF')
+    title_font = Font(bold=True, size=15, color='1A237E')
+    money_font = Font(bold=True, color='2E7D32')
+    danger_font = Font(bold=True, color='C62828')
+    total_fill = PatternFill('solid', fgColor='E8EAF6')
+    thin = Border(
+        left=Side(style='thin', color='DDDDDD'),
+        right=Side(style='thin', color='DDDDDD'),
+        top=Side(style='thin', color='DDDDDD'),
+        bottom=Side(style='thin', color='DDDDDD'),
+    )
+
+    ws.merge_cells('A1:D1')
+    ws['A1'] = cierre.encabezado
+    ws['A1'].font = title_font
+    ws['A1'].alignment = Alignment(horizontal='center')
+    ws.append([])
+    ws.append(['Periodo', f'{cierre.fecha_desde:%d/%m/%Y} - {cierre.fecha_hasta:%d/%m/%Y}', 'Guardado', cierre.fecha_cierre.strftime('%d/%m/%Y %H:%M')])
+    ws.append(['Responsable', cierre.cerrado_por.get_full_name() or cierre.cerrado_por.username if cierre.cerrado_por else '', 'Observaciones', cierre.observaciones or ''])
+    ws.append([])
+
+    def write_section(title, rows, start_row):
+        ws.cell(row=start_row, column=1, value=title)
+        ws.cell(row=start_row, column=1).font = Font(bold=True, color='1A237E')
+        header_row = start_row + 1
+        for col, header in enumerate(('Concepto', 'Monto'), start=1):
+            cell = ws.cell(row=header_row, column=col, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.border = thin
+            cell.alignment = Alignment(horizontal='center')
+        row_idx = header_row + 1
+        for label, amount, kind in rows:
+            ws.cell(row=row_idx, column=1, value=label).border = thin
+            amount_cell = ws.cell(row=row_idx, column=2, value=float(amount or Decimal('0.00')))
+            amount_cell.border = thin
+            amount_cell.number_format = '"$"#,##0.00'
+            if kind == 'danger':
+                amount_cell.font = danger_font
+            else:
+                amount_cell.font = money_font
+            if kind == 'total':
+                for c in (1, 2):
+                    ws.cell(row=row_idx, column=c).fill = total_fill
+                    ws.cell(row=row_idx, column=c).font = Font(bold=True, color='1A237E')
+            row_idx += 1
+        return row_idx + 1
+
+    next_row = 6
+    next_row = write_section('Ingresos congelados', [
+        ('Abonos (operación viva)', cierre.ingreso_abonos, 'money'),
+        ('Abonos de cursos cerrados', cierre.ingreso_abonos_archivados, 'money'),
+        ('Ventas / comprobantes', cierre.ingreso_ventas, 'money'),
+        ('Adicionales', cierre.ingreso_adicionales, 'money'),
+        ('TOTAL INGRESOS', cierre.ingreso_total, 'total'),
+    ], next_row)
+    next_row = write_section('Resumen final', [
+        ('TOTAL INGRESOS', cierre.ingreso_total, 'money'),
+        ('TOTAL EGRESOS', cierre.egreso_total, 'danger'),
+        ('BALANCE NETO', cierre.balance_neto, 'total'),
+    ], next_row)
+
+    for col, width in enumerate((34, 16, 18, 36), start=1):
+        ws.column_dimensions[get_column_letter(col)].width = width
+
+    ws2 = wb.create_sheet('Egresos')
+    ws2.append(['Categoría', 'Total'])
+    for cell in ws2[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = thin
+    for e in egresos_detalle:
+        ws2.append([f'{e.get("icono", "")} {e.get("categoria", "")}'.strip(), float(e.get('total') or 0)])
+        ws2.cell(row=ws2.max_row, column=2).number_format = '"$"#,##0.00'
+    ws2.append(['TOTAL EGRESOS', float(cierre.egreso_total)])
+    for cell in ws2[ws2.max_row]:
+        cell.fill = total_fill
+        cell.font = Font(bold=True, color='C62828')
+    ws2.column_dimensions['A'].width = 34
+    ws2.column_dimensions['B'].width = 16
+
+    ws3 = wb.create_sheet('Cierres de curso')
+    headers = ['Curso', 'Alcance', 'Jornada', 'Cerrado el', 'Matrículas', 'Facturado', 'Cobrado', 'Pendiente']
+    ws3.append(headers)
+    for cell in ws3[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = thin
+        cell.alignment = Alignment(horizontal='center')
+    for c in cierres_curso['cierres']:
+        ws3.append([
+            c.curso_nombre,
+            c.get_alcance_display(),
+            c.jornada_descripcion or '',
+            c.fecha_cierre.strftime('%d/%m/%Y %H:%M'),
+            c.total_matriculas,
+            float(c.total_facturado),
+            float(c.total_cobrado),
+            float(c.total_pendiente),
+        ])
+        for col in (6, 7, 8):
+            ws3.cell(row=ws3.max_row, column=col).number_format = '"$"#,##0.00'
+    widths = [30, 14, 30, 18, 12, 14, 14, 14]
+    for col, width in enumerate(widths, start=1):
+        ws3.column_dimensions[get_column_letter(col)].width = width
+
+    out = BytesIO()
+    wb.save(out)
+    out.seek(0)
+    response = HttpResponse(
+        out.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{_cierre_admin_filename(cierre, "xlsx")}"'
+    return response
+
+
+@admin_requerido
+def cierre_admin_export_pdf(request, pk):
+    """Exporta el corte administrativo congelado como PDF."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+    cierre = get_object_or_404(CierreAdministrativo, pk=pk)
+    egresos_detalle = _cierre_admin_egresos_detalle(cierre)
+    cierres_curso = _cierres_curso_periodo(cierre.fecha_desde, cierre.fecha_hasta)
+
+    out = BytesIO()
+    doc = SimpleDocTemplate(out, pagesize=A4, leftMargin=28, rightMargin=28, topMargin=28, bottomMargin=28)
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph(cierre.encabezado, styles['Title']),
+        Paragraph(
+            f'Periodo: {cierre.fecha_desde:%d/%m/%Y} - {cierre.fecha_hasta:%d/%m/%Y} · '
+            f'Guardado: {cierre.fecha_cierre:%d/%m/%Y %H:%M}',
+            styles['Normal'],
+        ),
+        Spacer(1, 10),
+    ]
+    if cierre.observaciones:
+        story.extend([Paragraph(f'Observaciones: {cierre.observaciones}', styles['Normal']), Spacer(1, 8)])
+
+    def money(value):
+        return f'${Decimal(str(value or 0)):,.2f}'
+
+    resumen = [
+        ['Concepto', 'Monto'],
+        ['Ingresos', money(cierre.ingreso_total)],
+        ['Egresos', money(cierre.egreso_total)],
+        ['Balance neto', money(cierre.balance_neto)],
+    ]
+    ingresos = [
+        ['Ingreso congelado', 'Monto'],
+        ['Abonos (operación viva)', money(cierre.ingreso_abonos)],
+        ['Abonos de cursos cerrados', money(cierre.ingreso_abonos_archivados)],
+        ['Ventas / comprobantes', money(cierre.ingreso_ventas)],
+        ['Adicionales', money(cierre.ingreso_adicionales)],
+        ['TOTAL', money(cierre.ingreso_total)],
+    ]
+
+    table_style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1A237E')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#DDDDDD')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+    ])
+
+    story.append(Table(resumen, colWidths=[300, 120], repeatRows=1, style=table_style))
+    story.extend([Spacer(1, 12), Paragraph('Ingresos congelados', styles['Heading2'])])
+    story.append(Table(ingresos, colWidths=[300, 120], repeatRows=1, style=table_style))
+
+    story.extend([Spacer(1, 12), Paragraph('Egresos por categoría', styles['Heading2'])])
+    egresos_data = [['Categoría', 'Total']]
+    for e in egresos_detalle:
+        egresos_data.append([f'{e.get("icono", "")} {e.get("categoria", "")}'.strip(), money(e.get('total') or 0)])
+    if len(egresos_data) == 1:
+        egresos_data.append(['Sin egresos en este corte', '$0.00'])
+    egresos_data.append(['TOTAL', money(cierre.egreso_total)])
+    story.append(Table(egresos_data, colWidths=[300, 120], repeatRows=1, style=table_style))
+
+    if cierres_curso['count']:
+        story.extend([Spacer(1, 12), Paragraph('Cierres de curso del periodo', styles['Heading2'])])
+        cursos_data = [['Curso', 'Matrículas', 'Cobrado']]
+        for c in cierres_curso['cierres']:
+            cursos_data.append([c.curso_nombre, str(c.total_matriculas), money(c.total_cobrado)])
+        story.append(Table(cursos_data, colWidths=[300, 70, 100], repeatRows=1, style=table_style))
+
+    doc.build(story)
+    out.seek(0)
+    response = HttpResponse(out.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{_cierre_admin_filename(cierre, "pdf")}"'
+    return response
 
 
 @admin_requerido

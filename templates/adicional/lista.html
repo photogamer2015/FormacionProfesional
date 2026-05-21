@@ -3,6 +3,23 @@
 {% block title %}Lista de Adicionales{% endblock %}
 
 {% block content %}
+<style>
+    .card-box2 {
+        background: var(--card-bg);
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 6px 18px rgba(255, 255, 255, 1);
+        transition: all 0.2s ease;
+        border: 1px solid #de9606ff;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .card-box2:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 5px rgba(27, 98, 174, 0.94);
+    }
+</style>
 <div class="crumb">
     <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
     <a href="{% url 'academia:adicional_menu' %}">Adicional</a> &nbsp;›&nbsp; Lista
@@ -17,13 +34,13 @@
         </p>
     </div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <a href="{% url 'academia:adicionales_archivados_lista' %}" class="btn btn-secondary">🗄️ Archivados</a>
-        <a href="{% url 'academia:adicional_cierre' %}" class="btn"
+        <a href="{% url 'academia:adicionales_archivados_lista' %}" class="btn btn-secondary, card-box2">🗄️ Archivados</a>
+        <a href="{% url 'academia:adicional_cierre' %}" class="btn, card-box2"
            style="background:linear-gradient(135deg,#ff3d00,#d50000); color:#fff; font-weight:700;">
             🔒 Cierre adicional
         </a>
-        <a href="{% url 'academia:adicional_crear_interno' %}" class="btn btn-success">＋ Adicional Interno</a>
-        <a href="{% url 'academia:adicional_crear_externo' %}" class="btn btn-primary">＋ Persona Externa</a>
+        <a href="{% url 'academia:adicional_crear_interno' %}" class="btn btn-success, card-box2">＋ Adicional Interno</a>
+        <a href="{% url 'academia:adicional_crear_externo' %}" class="btn btn-success, card-box2">＋ Persona Externa</a>
     </div>
 </div>
 

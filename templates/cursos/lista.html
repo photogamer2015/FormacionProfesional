@@ -35,6 +35,21 @@
         background: #1e1e1e;
         color: #e0e0e0;
     }
+    .card-box2 {
+        background: var(--card-bg);
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 6px 18px rgba(255, 255, 255, 1);
+        transition: all 0.2s ease;
+        border: 1px solid #de9606ff;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .card-box2:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 5px rgba(27, 98, 174, 0.94);
+    }
 </style>
 {% endblock %}
 
@@ -53,23 +68,23 @@
     {% if puede_agregar_categorias or puede_agregar_cursos or es_admin %}
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
         {% if puede_agregar_categorias %}
-        <button type="button" class="btn btn-secondary" id="btn-abrir-modal-cat"
+        <button type="button" class="btn btn-secondary, card-box2" id="btn-abrir-modal-cat"
                 style="background:#FFD700; color:#1a237e; border-color:#FFD700; font-weight:700;">
             + Agregar categoría
         </button>
         {% endif %}
         {% if puede_agregar_cursos %}
-        <a href="{% url 'academia:curso_crear' %}?modalidad={{ modalidad }}" class="btn btn-success">
+        <a href="{% url 'academia:curso_crear' %}?modalidad={{ modalidad }}" class="btn btn-success, card-box2">
             + Nuevo curso {{ modalidad_label|lower }}
         </a>
         {% endif %}
         {% if es_admin %}
-        <a href="{% url 'academia:cierre_historial' %}" class="btn btn-secondary"
+        <a href="{% url 'academia:cierre_historial' %}" class="btn btn-secondary, card-box2"
            title="Ver historial de cierres realizados">
             🗄️ Historial cierres
         </a>
         <a href="{% url 'academia:cierre_global_preview' modalidad=modalidad %}"
-           class="btn"
+           class="btn, card-box2"
            style="background:#FF4500; color:white; font-weight:700;"
            title="Archivar TODAS las matrículas y pagos de todos los cursos {{ modalidad_label|lower }}, limpiando la operación viva para empezar un nuevo ciclo desde cero">
             🔒 Cierre TOTAL ({{ modalidad_label|lower }})

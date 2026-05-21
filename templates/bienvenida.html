@@ -34,7 +34,7 @@
         color: #90caf9;
     }
     body.dark-mode .card-box:hover {
-        box-shadow: 0 12px 28px rgba(0,0,0,0.4);
+        box-shadow: 0 12px 28px rgba(11, 67, 123, 1);
     }
     body.dark-mode .status-ok {
         background: #1b3a1c;
@@ -111,16 +111,16 @@
         background: var(--card-bg);
         border-radius: 14px;
         padding: 18px;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 6px 18px rgba(255, 255, 255, 1);
         transition: all 0.2s ease;
-        border: 1px solid #eee;
+        border: 1px solid #17369cff;
         text-decoration: none;
         color: inherit;
     }
 
     .card-box:hover {
         transform: translateY(-5px);
-        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 20px 30px rgba(226, 110, 43, 0.94);
     }
 
     .card-header {
@@ -453,8 +453,7 @@
         </div>
         <div class="card-footer">
             <span class="status-ok">Disponible</span>
-            <span class="card-number">Total: {{ stats.total_cursos_presencial }}</span>
-            <span> →</span>
+            <span>Ingresar →</span>
         </div>
     </a>
 

@@ -141,6 +141,44 @@
         {{ form.observaciones }}
     </div>
 
+    <h3 class="form-section-title" style="margin-top:32px;">🧾 Factura</h3>
+    <div class="form-grid">
+        <div>
+            <label class="form-label" for="{{ form.factura_realizada.id_for_label }}">{{ form.factura_realizada.label }}</label>
+            {{ form.factura_realizada }}
+            {{ form.factura_realizada.errors }}
+        </div>
+    </div>
+
+    <div id="datos-factura-wrap" style="margin-top:14px;">
+        <div style="font-size:13px; font-weight:600; color:#1A237E; margin-bottom:8px;">Datos para factura</div>
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="{{ form.fact_nombres.id_for_label }}">{{ form.fact_nombres.label }}</label>
+                {{ form.fact_nombres }}
+                {{ form.fact_nombres.errors }}
+            </div>
+            <div>
+                <label class="form-label" for="{{ form.fact_apellidos.id_for_label }}">{{ form.fact_apellidos.label }}</label>
+                {{ form.fact_apellidos }}
+                {{ form.fact_apellidos.errors }}
+            </div>
+            <div>
+                <label class="form-label" for="{{ form.fact_cedula.id_for_label }}">{{ form.fact_cedula.label }}</label>
+                {{ form.fact_cedula }}
+                {{ form.fact_cedula.errors }}
+            </div>
+            <div>
+                <label class="form-label" for="{{ form.fact_correo.id_for_label }}">{{ form.fact_correo.label }}</label>
+                {{ form.fact_correo }}
+                {{ form.fact_correo.errors }}
+            </div>
+        </div>
+        <small style="color:#888; font-size:11px; display:block; margin-top:6px;">
+            Estos datos solo son obligatorios cuando "Factura realizada" = Sí.
+        </small>
+    </div>
+
     <div style="display:flex; gap:10px; margin-top:24px; justify-content:flex-end;">
         {% if modo == 'editar' and adicional %}
         <a href="{% url 'academia:adicional_archivar' adicional.pk %}"
@@ -151,23 +189,129 @@
         </a>
         {% endif %}
         <a href="{% url 'academia:adicional_lista' %}" class="btn btn-secondary">Cancelar</a>
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" id="submit-btn" class="btn btn-primary">
             {% if modo == 'editar' %}💾 Guardar cambios{% else %}＋ Registrar adicional{% endif %}
         </button>
     </div>
 </form>
 
+<style>
+    .field-required { box-shadow: 0 0 0 2px rgba(198,40,40,0.06); border-color: #c62828 !important; }
+    .req-star { color: #c62828; margin-left:6px; font-weight:700; }
+</style>
+
 {% block extra_js %}
 <script>
 (function () {
+    const form        = document.getElementById('form-adicional-externo');
     const inputCedula = document.getElementById('id_cedula_externa');
     const status      = document.getElementById('cedula-status-ext');
     const infoBox     = document.getElementById('persona-info');
     const tipoSel     = document.getElementById('id_tipo_adicional');
+    const submitBtn   = document.getElementById('submit-btn');
 
     const bloqueCurso  = document.getElementById('bloque-curso');
     const bloqueTalla  = document.getElementById('bloque-talla');
     const campoModulo  = document.getElementById('campo-modulo');
+    const metodoSel = document.getElementById('id_metodo_pago');
+    const bloqueBanco = document.getElementById('bloque-banco');
+    const facturaSelect = document.getElementById('id_factura_realizada');
+    const datosFacturaWrap = document.getElementById('datos-factura-wrap');
+    const facturaCampos = [
+        { name: 'fact_nombres', label: 'Nombres (factura)' },
+        { name: 'fact_apellidos', label: 'Apellidos (factura)' },
+        { name: 'fact_cedula', label: 'Cédula / RUC (factura)' },
+        { name: 'fact_correo', label: 'Correo (factura)' },
+    ];
+    const camposBase = [
+        { name: 'cedula_externa', label: 'Cédula de la persona externa' },
+        { name: 'tipo_adicional', label: 'Tipo de adicional' },
+        { name: 'fecha', label: 'Fecha' },
+        { name: 'valor', label: 'Valor' },
+        { name: 'metodo_pago', label: 'Método de pago' },
+        { name: 'factura_realizada', label: '¿Factura realizada?' },
+    ];
+
+    function campoPorNombre(nombre) {
+        return document.querySelector(`[name="${nombre}"]`);
+    }
+
+    function campoVacio(nombre) {
+        const el = campoPorNombre(nombre);
+        if (!el) return true;
+        const valor = (el.value || '').trim();
+        return valor === '' || valor === 'None';
+    }
+
+    function limpiarErrorCampo(nombre) {
+        const el = campoPorNombre(nombre);
+        if (!el) return;
+        el.style.borderColor = '';
+        el.style.borderWidth = '';
+        el.classList.remove('field-required');
+    }
+
+    function marcarErrorCampo(nombre) {
+        const el = campoPorNombre(nombre);
+        if (!el) return null;
+        el.style.borderColor = '#c62828';
+        el.style.borderWidth = '2px';
+        return el;
+    }
+
+    function esTipoCurso() {
+        const t = tipoSel ? tipoSel.value : '';
+        return ['cert_matricula', 'cert_asistencia', 'cert_antiguo', 'examen_supletorio'].includes(t);
+    }
+
+    function esCamisa() {
+        return tipoSel && tipoSel.value === 'camisa';
+    }
+
+    function facturaEsSi() {
+        return facturaSelect && facturaSelect.value === 'si';
+    }
+
+    function camposRequeridosActuales() {
+        const campos = [...camposBase];
+        if (esTipoCurso()) {
+            campos.push({ name: 'curso', label: 'Curso' });
+            campos.push({ name: 'modalidad', label: 'Modalidad' });
+        }
+        if (esCamisa()) {
+            campos.push({ name: 'talla_camiseta', label: 'Talla de camiseta' });
+        }
+        if (metodoSel && ['transferencia', 'tarjeta'].includes(metodoSel.value)) {
+            campos.push({ name: 'banco', label: metodoSel.value === 'tarjeta' ? 'Tarjeta / App' : 'Banco' });
+        }
+        if (facturaEsSi()) {
+            campos.push(...facturaCampos);
+        }
+        return campos;
+    }
+
+    function validarCamposPrincipales() {
+        if (!submitBtn) return;
+        const completos = camposRequeridosActuales().every(({ name }) => !campoVacio(name));
+        submitBtn.disabled = !completos;
+        submitBtn.style.opacity = completos ? '1' : '0.45';
+        submitBtn.style.cursor = completos ? 'pointer' : 'not-allowed';
+        submitBtn.style.pointerEvents = completos ? 'auto' : 'none';
+    }
+
+    function completarFacturaSiVacia(d) {
+        const valores = {
+            fact_nombres: d.nombres || '',
+            fact_apellidos: d.apellidos || '',
+            fact_cedula: inputCedula ? inputCedula.value.trim() : '',
+            fact_correo: d.correo || '',
+        };
+        facturaCampos.forEach(({ name: nombre }) => {
+            const el = campoPorNombre(nombre);
+            if (el && !el.value) el.value = valores[nombre] || '';
+        });
+        validarCamposPrincipales();
+    }
 
     // Pre-llenar cédula si viene en query string (?cedula=...)
     const urlParams = new URLSearchParams(window.location.search);
@@ -199,6 +343,8 @@
                             ${d.ciudad ? ' · 🏙 ' + d.ciudad : ''}
                         </span>
                     `;
+                    completarFacturaSiVacia(d);
+                    validarCamposPrincipales();
                 } else if (d.es_estudiante) {
                     status.textContent = d.es_archivado ? '⚠️ estudiante archivado' : '⚠️ es estudiante';
                     status.style.color = '#e65100';
@@ -209,6 +355,7 @@
                         </div>
                         <a href="{% url 'academia:adicional_crear_interno' %}?cedula=${encodeURIComponent(ced)}" class="btn btn-warning btn-sm" style="margin-top:8px;">Ir a Estudiante Interno</a>
                     `;
+                    validarCamposPrincipales();
                 } else {
                     status.textContent = '✗ no existe';
                     status.style.color = '#c62828';
@@ -218,6 +365,7 @@
                         </span>
                         <br><a href="{% url 'academia:persona_externa_crear' %}?cedula=${encodeURIComponent(ced)}" class="btn btn-primary btn-sm" style="margin-top:6px;">＋ Registrar nueva</a>
                     `;
+                    validarCamposPrincipales();
                 }
             })
             .catch(() => {
@@ -230,6 +378,7 @@
             clearTimeout(timer);
             const v = this.value.trim();
             timer = setTimeout(() => consultarCedula(v), 350);
+            validarCamposPrincipales();
         });
         if (inputCedula.value) consultarCedula(inputCedula.value.trim());
     }
@@ -243,16 +392,50 @@
         bloqueCurso.style.display = (esCert || esSupletorio) ? 'block' : 'none';
         campoModulo.style.display = esSupletorio ? 'block' : 'none';
         bloqueTalla.style.display = esCamisa ? 'block' : 'none';
+        validarCamposPrincipales();
     }
     if (tipoSel) {
         tipoSel.addEventListener('change', actualizarBloques);
         actualizarBloques();
     }
 
+    function actualizarFactura() {
+        if (!datosFacturaWrap) return;
+        const requerida = facturaEsSi();
+        datosFacturaWrap.style.opacity = requerida ? '1' : '0.65';
+        facturaCampos.forEach(({ name: nombre }) => {
+            const el = campoPorNombre(nombre);
+            if (!el) return;
+            const label = el.id ? document.querySelector(`label[for="${el.id}"]`) : null;
+            if (requerida) {
+                el.setAttribute('required', 'required');
+                el.classList.add('field-required');
+                if (label && !label.querySelector('.req-star')) {
+                    const star = document.createElement('span');
+                    star.className = 'req-star';
+                    star.textContent = ' *';
+                    label.appendChild(star);
+                }
+            } else {
+                el.removeAttribute('required');
+                el.classList.remove('field-required');
+                el.style.borderColor = '';
+                el.style.borderWidth = '';
+                if (label) {
+                    const star = label.querySelector('.req-star');
+                    if (star) star.remove();
+                }
+            }
+        });
+        validarCamposPrincipales();
+    }
+    if (facturaSelect) {
+        facturaSelect.addEventListener('change', actualizarFactura);
+        actualizarFactura();
+    }
+
     // ── Mostrar/ocultar bloque de banco según el método de pago ──
     (function () {
-        const metodoSel = document.getElementById('id_metodo_pago');
-        const bloqueBanco = document.getElementById('bloque-banco');
         if (!metodoSel || !bloqueBanco) return;
 
         function actualizar() {
@@ -289,10 +472,44 @@
                 bloqueBanco.style.display = 'none';
                 if (bancoSel) bancoSel.value = '';
             }
+            validarCamposPrincipales();
         }
         metodoSel.addEventListener('change', actualizar);
         actualizar();
     })();
+
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            let primerError = null;
+            camposRequeridosActuales().forEach(({ name }) => limpiarErrorCampo(name));
+
+            for (const { name, label } of camposRequeridosActuales()) {
+                if (campoVacio(name)) {
+                    const el = marcarErrorCampo(name);
+                    if (!primerError && el) primerError = { el, label };
+                }
+            }
+
+            if (primerError) {
+                e.preventDefault();
+                e.stopPropagation();
+                primerError.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                try { primerError.el.focus(); } catch (_) {}
+                return false;
+            }
+        });
+    }
+
+    document.addEventListener('input', function (e) {
+        if (e.target && e.target.name) limpiarErrorCampo(e.target.name);
+        validarCamposPrincipales();
+    });
+    document.addEventListener('change', function (e) {
+        if (e.target && e.target.name) limpiarErrorCampo(e.target.name);
+        validarCamposPrincipales();
+    });
+
+    validarCamposPrincipales();
 })();
 </script>
 {% endblock %}

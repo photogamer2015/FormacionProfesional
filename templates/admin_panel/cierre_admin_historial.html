@@ -70,7 +70,7 @@
                 <th>de cursos cerrados</th>
                 <th>Egresos</th>
                 <th>Balance neto</th>
-                <th>Acción</th>
+                <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
@@ -94,6 +94,8 @@
                 </td>
                 <td>
                     <a href="{% url 'academia:cierre_admin_detalle' c.pk %}" class="btn btn-primary btn-sm">Ver</a>
+                    <a href="{% url 'academia:cierre_admin_export_excel' c.pk %}" class="btn btn-success btn-sm">Excel</a>
+                    <a href="{% url 'academia:cierre_admin_export_pdf' c.pk %}" class="btn btn-secondary btn-sm">PDF</a>
                 </td>
             </tr>
             {% endfor %}

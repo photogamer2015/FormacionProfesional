@@ -510,17 +510,29 @@
         </div>
 
         <p style="font-size:13px; color:#555; margin-bottom:16px;">
+            {% if cierre_admin_existente %}
+            El corte de caja oficial de {{ mes_nombre }} {{ anio }} ya está <strong>archivado</strong>.
+            Puedes verlo o generar otro corte manual del mismo mes sin reemplazar el anterior.
+            {% else %}
             Genera el <strong>corte de caja oficial</strong> de {{ mes_nombre }} {{ anio }}:
             congela ingresos (incluido el dinero de cursos cerrados), egresos y balance neto.
+            {% endif %}
         </p>
 
         {# Resumen del corte actual #}
         <div style="background:#f9fafc; border-radius:10px; padding:16px; margin-bottom:16px;">
             <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e0e0e0;">
                 <span style="font-size:13px; color:#2e7d32;">▲ Ingresos del mes</span>
-                <strong style="color:#2e7d32;">${{ ingresos.total|floatformat:2 }}</strong>
+                <strong style="color:#2e7d32;">
+                    {% if cierre_admin_existente %}${{ cierre_admin_existente.ingreso_total|floatformat:2 }}{% else %}${{ ingresos.total|floatformat:2 }}{% endif %}
+                </strong>
             </div>
-            {% if ingresos.abonos_archivados > 0 %}
+            {% if cierre_admin_existente and cierre_admin_existente.ingreso_abonos_archivados > 0 %}
+            <div style="display:flex; justify-content:space-between; padding:4px 0; padding-left:14px;">
+                <span style="font-size:11px; color:#888;">↳ incluye de cursos cerrados</span>
+                <span style="font-size:11px; color:#888;">${{ cierre_admin_existente.ingreso_abonos_archivados|floatformat:2 }}</span>
+            </div>
+            {% elif ingresos.abonos_archivados > 0 %}
             <div style="display:flex; justify-content:space-between; padding:4px 0; padding-left:14px;">
                 <span style="font-size:11px; color:#888;">↳ incluye de cursos cerrados</span>
                 <span style="font-size:11px; color:#888;">${{ ingresos.abonos_archivados|floatformat:2 }}</span>
@@ -528,27 +540,45 @@
             {% endif %}
             <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e0e0e0;">
                 <span style="font-size:13px; color:#c62828;">▼ Egresos del mes</span>
-                <strong style="color:#c62828;">−${{ egresos_total|floatformat:2 }}</strong>
+                <strong style="color:#c62828;">
+                    −{% if cierre_admin_existente %}${{ cierre_admin_existente.egreso_total|floatformat:2 }}{% else %}${{ egresos_total|floatformat:2 }}{% endif %}
+                </strong>
             </div>
             <div style="display:flex; justify-content:space-between; padding:8px 0 0;">
                 <span style="font-size:14px; font-weight:700; color:#1a237e;">= Balance neto</span>
+                {% if cierre_admin_existente %}
+                <strong style="font-size:18px; color:{% if cierre_admin_existente.balance_neto >= 0 %}#2e7d32{% else %}#c62828{% endif %};">
+                    {% if cierre_admin_existente.balance_neto >= 0 %}+{% endif %}${{ cierre_admin_existente.balance_neto|floatformat:2 }}
+                </strong>
+                {% else %}
                 <strong style="font-size:18px; color:{% if balance >= 0 %}#2e7d32{% else %}#c62828{% endif %};">
                     {% if balance >= 0 %}+{% endif %}${{ balance|floatformat:2 }}
                 </strong>
+                {% endif %}
             </div>
         </div>
 
         {% if cierre_admin_existente %}
         <div style="background:#e8f5e9; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:12px; color:#2e7d32;">
-            ✓ Ya existe un corte para este mes (guardado {{ cierre_admin_existente.fecha_cierre|date:"d/m/Y H:i" }}).
+            ✓ Corte archivado para este mes (guardado {{ cierre_admin_existente.fecha_cierre|date:"d/m/Y H:i" }}).
             <a href="{% url 'academia:cierre_admin_detalle' cierre_admin_existente.pk %}" style="color:#1a237e; font-weight:600;">Ver corte →</a>
         </div>
+        <a href="{% url 'academia:cierre_admin_detalle' cierre_admin_existente.pk %}"
+           class="btn" style="background:#1a237e; color:white; width:100%; text-align:center; font-weight:700;">
+            🗄️ Ver corte archivado de {{ mes_nombre }}
+        </a>
+        {% if tiene_valores_corte %}
+        <a href="{% url 'academia:cierre_admin_preview' %}?anio={{ anio }}&mes={{ mes }}"
+           class="btn" style="background:#2e7d32; color:white; width:100%; text-align:center; font-weight:700; margin-top:8px;">
+            🧾 Nuevo corte manual de {{ mes_nombre }}
+        </a>
         {% endif %}
-
+        {% else %}
         <a href="{% url 'academia:cierre_admin_preview' %}?anio={{ anio }}&mes={{ mes }}"
            class="btn" style="background:#1a237e; color:white; width:100%; text-align:center; font-weight:700;">
-            🧾 {% if cierre_admin_existente %}Actualizar{% else %}Generar{% endif %} corte de caja de {{ mes_nombre }}
+            🧾 Generar corte de caja de {{ mes_nombre }}
         </a>
+        {% endif %}
     </div>
 
 </div>

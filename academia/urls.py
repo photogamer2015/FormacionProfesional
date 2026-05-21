@@ -156,6 +156,10 @@ urlpatterns = [
          views_admin.cierre_admin_historial, name='cierre_admin_historial'),
     path('admin-panel/cierre/<int:pk>/',
          views_admin.cierre_admin_detalle, name='cierre_admin_detalle'),
+    path('admin-panel/cierre/<int:pk>/exportar/excel/',
+         views_admin.cierre_admin_export_excel, name='cierre_admin_export_excel'),
+    path('admin-panel/cierre/<int:pk>/exportar/pdf/',
+         views_admin.cierre_admin_export_pdf, name='cierre_admin_export_pdf'),
     path('admin-panel/cierre/<int:pk>/eliminar/',
          views_admin.cierre_admin_eliminar, name='cierre_admin_eliminar'),
 

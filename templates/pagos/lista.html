@@ -4,6 +4,37 @@
 
 {% block extra_head %}
 <style>
+    .card-box {
+        background: var(--card-bg);
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 6px 18px rgba(255, 255, 255, 1);
+        transition: all 0.2s ease;
+        border: 1px solid #17369cff;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .card-box:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 5px rgba(226, 110, 43, 0.94);
+    }
+      .card-box2 {
+        background: var(--card-bg);
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 6px 18px rgba(255, 255, 255, 1);
+        transition: all 0.2s ease;
+        border: 1px solid #de9606ff;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .card-box2:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 5px rgba(27, 98, 174, 0.94);
+    }
+
     .payment-summary {
         display: flex;
         flex-direction: column;
@@ -195,25 +226,25 @@
         </p>
     </div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <a href="{% url 'academia:pagos_por_modulo' %}" class="btn btn-primary">
+        <a href="{% url 'academia:pagos_por_modulo' %}" class="btn btn-primary, card-box2">
             📊 Por Módulo
         </a>
-        <a href="{% url 'academia:recuperaciones_lista' %}" class="btn btn-warning"
+        <a href="{% url 'academia:recuperaciones_lista' %}" class="btn btn-warning, card-box2"
            style="background:#f0ad4e; color:white; text-decoration:none;">
             ✱ Recuperaciones
         </a>
-        <a href="{% url 'academia:hoja_recaudacion' %}" class="btn btn-secondary">
+        <a href="{% url 'academia:hoja_recaudacion' %}" class="btn btn-secondary, card-box2">
             🖨️ Hoja Recaudación
         </a>
         <a href="{% url 'academia:pagos_export' %}?estado={{ filtros.estado }}&curso={{ filtros.curso }}&modalidad={{ filtros.modalidad }}&anio={{ filtros.anio }}&q={{ filtros.q }}"
-           class="btn btn-success">
+           class="btn btn-success, card-box2">
             📥 Excel
         </a>
         <a href="{% url 'academia:pagos_export_pdf' %}?estado={{ filtros.estado }}&curso={{ filtros.curso }}&modalidad={{ filtros.modalidad }}&anio={{ filtros.anio }}&q={{ filtros.q }}"
-           class="btn btn-secondary">
+           class="btn btn-secondary, card-box2">
             📄 PDF
         </a>
-        <button type="button" onclick="window.print()" class="btn btn-secondary no-print">
+        <button type="button" onclick="window.print()" class="btn btn-secondary no-print, card-box">
             🖨️ Imprimir
         </button>
     </div>
@@ -247,7 +278,7 @@
     </a>
 
     <a href="?estado=ModuloPendiente" style="text-decoration:none;">
-        <div class="card-box" style="border-top:4px solid #c62828; padding:16px; cursor:pointer; {% if filtros.estado == 'ModuloPendiente' %}box-shadow:0 0 0 2px #c62828;{% endif %}">
+        <div class="card-box" style="border-top:4px solid #f80a0aff; padding:16px; cursor:pointer; {% if filtros.estado == 'ModuloPendiente' %}box-shadow:0 0 0 2px #c62828;{% endif %}">
             <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">PENDIENTE</div>
             <div style="font-size:26px; font-weight:700; color:#c62828; margin-top:4px;">{{ conteo_modulos_pendientes }}</div>
             <div style="font-size:12px; color:#666; margin-top:4px;">Falta de módulo</div>
@@ -294,7 +325,7 @@
         <div style="font-size:12px; color:#666; margin-top:4px;">Ingresos efectivos</div>
     </div>
 
-    <div class="card-box" style="border-top:4px solid #c62828; padding:16px;">
+    <div class="card-box" style="border-top:4px solid #711515ff; padding:16px;">
         <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">POR COBRAR</div>
         <div style="font-size:22px; font-weight:700; color:#c62828; margin-top:4px;">${{ totales.total_pendiente|floatformat:2 }}</div>
         <div style="font-size:12px; color:#666; margin-top:4px;">Saldo total</div>

@@ -1340,6 +1340,28 @@ class Adicional(models.Model):
         help_text='Número de comprobante. Si se deja vacío, se genera automáticamente.'
     )
 
+    # ── Factura ──────────────────────────────────────────
+    factura_realizada = models.CharField(
+        max_length=2, choices=SI_NO, default='no',
+        help_text='¿Se emitió factura para este adicional?'
+    )
+    fact_nombres = models.CharField(
+        max_length=120, blank=True,
+        help_text='Nombres del titular de la factura.'
+    )
+    fact_apellidos = models.CharField(
+        max_length=120, blank=True,
+        help_text='Apellidos del titular de la factura.'
+    )
+    fact_cedula = models.CharField(
+        max_length=20, blank=True,
+        help_text='Cédula o RUC para la factura.'
+    )
+    fact_correo = models.EmailField(
+        blank=True,
+        help_text='Correo electrónico para enviar la factura.'
+    )
+
     observaciones = models.TextField(blank=True)
 
     # ── Auditoría ──
@@ -1804,6 +1826,13 @@ class AdicionalArchivado(models.Model):
     banco = models.CharField(max_length=30, blank=True)
     banco_label = models.CharField(max_length=40, blank=True)
     numero_recibo = models.CharField(max_length=30, blank=True)
+
+    # ── Factura ──────────────────────────────────────────
+    factura_realizada = models.CharField(max_length=2, blank=True)
+    fact_nombres = models.CharField(max_length=120, blank=True)
+    fact_apellidos = models.CharField(max_length=120, blank=True)
+    fact_cedula = models.CharField(max_length=20, blank=True)
+    fact_correo = models.EmailField(blank=True)
     
     observaciones = models.TextField(blank=True)
 
