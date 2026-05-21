@@ -138,6 +138,14 @@
 
     {# Botones #}
     <div style="display:flex; gap:10px; margin-top:24px; justify-content:flex-end;">
+        {% if modo == 'editar' and adicional %}
+        <a href="{% url 'academia:adicional_archivar' adicional.pk %}"
+           class="btn btn-sm"
+           title="Archivar este adicional"
+           style="background:linear-gradient(135deg,#e65100,#ef6c00); color:#fff;">
+            🗄️ Archivar
+        </a>
+        {% endif %}
         <a href="{% url 'academia:adicional_lista' %}" class="btn btn-secondary">Cancelar</a>
         <button type="submit" class="btn btn-primary">
             {% if modo == 'editar' %}💾 Guardar cambios{% else %}＋ Registrar adicional{% endif %}
@@ -157,6 +165,12 @@
     const bloqueTalla  = document.getElementById('bloque-talla');
     const campoModulo  = document.getElementById('campo-modulo');
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const cedulaQS = urlParams.get('cedula');
+    if (cedulaQS && inputCedula && !inputCedula.value) {
+        inputCedula.value = cedulaQS;
+    }
+
     let timer = null;
     function consultarCedula(ced) {
         if (!ced) {
@@ -170,8 +184,8 @@
             .then(r => r.json())
             .then(d => {
                 if (d.existe) {
-                    status.textContent = '✓ encontrado';
-                    status.style.color = '#2e7d32';
+                    status.textContent = d.desde_archivo ? '✓ recuperado del archivo' : '✓ encontrado';
+                    status.style.color = d.desde_archivo ? '#e65100' : '#2e7d32';
                     infoBox.innerHTML = `
                         <strong>${d.apellidos} ${d.nombres}</strong><br>
                         <span style="color:#888; font-size:12px;">
@@ -179,6 +193,7 @@
                             ${d.correo ? ' · 📧 ' + d.correo : ''}
                             ${d.ciudad ? ' · 🏙 ' + d.ciudad : ''}
                         </span>
+                        ${d.desde_archivo ? '<div style="margin-top:6px; color:#e65100; font-size:12px;">🗄️ Está archivado; se recuperará como estudiante interno al guardar.</div>' : ''}
                     `;
                 } else if (d.es_externa) {
                     status.textContent = '⚠️ es persona externa';

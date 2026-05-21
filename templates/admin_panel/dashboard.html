@@ -198,6 +198,26 @@
             </a>
         </div>
     </div>
+
+    {# Adicionales archivados del mes #}
+    <div class="card-box" style="border-top:4px solid #ff9800; padding:18px; background:linear-gradient(135deg, #ffffff 0%, #fff8e1 100%);">
+        <div style="font-size:11px; color:#888; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">🗄️ Adicionales archivados</div>
+        <div style="font-size:28px; font-weight:700; color:#e65100; margin:8px 0 4px;">
+            ${{ adicionales_archivados_mes.total|floatformat:2 }}
+        </div>
+        <div style="font-size:11px; color:#666;">
+            {{ adicionales_archivados_mes.count }} registro{{ adicionales_archivados_mes.count|pluralize }} archivado{{ adicionales_archivados_mes.count|pluralize }} ·
+            Internos: <strong>${{ adicionales_archivados_mes.interno|floatformat:2 }}</strong>
+            {% if adicionales_archivados_mes.externo > 0 %}
+                · Externos: <strong>${{ adicionales_archivados_mes.externo|floatformat:2 }}</strong>
+            {% endif %}
+        </div>
+        <div style="margin-top:8px;">
+            <a href="{% url 'academia:adicionales_archivados_lista' %}?anio={{ anio }}&mes={{ mes }}" style="font-size:11px; color:#e65100; font-weight:600; text-decoration:none;">
+                Ver archivo adicional →
+            </a>
+        </div>
+    </div>
 </div>
 
 {# ─── ★ NUEVO: Desglose de Adicionales del mes por tipo ★ ─── #}

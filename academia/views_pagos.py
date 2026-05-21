@@ -191,9 +191,7 @@ def _filtrar_matriculas(request):
             | Q(curso__nombre__icontains=q)
         )
 
-    # Filtro por estado (Pagado/Parcial/Pendiente/Retiro) — se hace en Python
-    # porque saldo es una @property, no un campo de DB.
-    # Para mantener qs como queryset, traduzco el estado a condiciones:
+    # Filtro por estado financiero y por falta de pago de módulos.
     if estado == 'Retiro':
         qs = qs.filter(estado='retiro_voluntario')
     elif estado == 'Pagado':
@@ -202,6 +200,12 @@ def _filtrar_matriculas(request):
         qs = qs.filter(valor_pagado__gt=0, valor_pagado__lt=models_F('valor_curso')).exclude(estado='retiro_voluntario')
     elif estado == 'Pendiente':
         qs = qs.filter(Q(valor_pagado=0) | Q(valor_pagado__isnull=True)).exclude(estado='retiro_voluntario')
+    elif estado == 'ModuloPendiente':
+        ids = [
+            m.pk for m in qs.exclude(estado='retiro_voluntario').select_related('curso')
+            if _tiene_modulo_pendiente(m)
+        ]
+        qs = qs.filter(pk__in=ids)
 
     return qs, {
         'estado': estado,
@@ -211,6 +215,22 @@ def _filtrar_matriculas(request):
         'mes': mes,
         'q': q,
     }
+
+
+def _tiene_modulo_pendiente(matricula):
+    """
+    Devuelve True si a la matrícula le falta al menos un módulo por pagar.
+    Un abono general no cuenta como pago de módulo; solo los pagos por módulo
+    o recuperaciones aplicadas a módulo alimentan `desglose_pagos_por_modulo`.
+    Si el curso ya está totalmente pagado, el modelo marca todos los módulos
+    como pagados.
+    """
+    if matricula.estado == 'retiro_voluntario':
+        return False
+    return any(
+        modulo['estado'] != 'Pagado'
+        for modulo in matricula.desglose_pagos_por_modulo()
+    )
 
 
 def _resumen_abonos(abonos):
@@ -297,6 +317,11 @@ def pagos_lista(request):
     # Conteo por estado y recálculo de saldo pendiente sin retiros
     todos_los_pagos = list(qs_sin_estado.values('valor_curso', 'descuento', 'valor_pagado', 'estado'))
     conteo_estado = {'Pagado': 0, 'Parcial': 0, 'Pendiente': 0, 'Retiro': 0}
+    conteo_modulos_pendientes = 0
+
+    for matricula in qs_sin_estado.select_related('curso').exclude(estado='retiro_voluntario'):
+        if _tiene_modulo_pendiente(matricula):
+            conteo_modulos_pendientes += 1
     
     for p in todos_los_pagos:
         vc = p['valor_curso'] or Decimal('0.00')
@@ -332,6 +357,7 @@ def pagos_lista(request):
         'filtros': filtros,
         'totales': totales,
         'conteo_estado': conteo_estado,
+        'conteo_modulos_pendientes': conteo_modulos_pendientes,
     })
 
 

@@ -246,10 +246,10 @@
         </div>
     </a>
 
-    <a href="?estado=Pendiente" style="text-decoration:none;">
-        <div class="card-box" style="border-top:4px solid #c62828; padding:16px; cursor:pointer; {% if filtros.estado == 'Pendiente' %}box-shadow:0 0 0 2px #c62828;{% endif %}">
+    <a href="?estado=ModuloPendiente" style="text-decoration:none;">
+        <div class="card-box" style="border-top:4px solid #c62828; padding:16px; cursor:pointer; {% if filtros.estado == 'ModuloPendiente' %}box-shadow:0 0 0 2px #c62828;{% endif %}">
             <div style="font-size:11px; color:#888; font-weight:600; letter-spacing:0.5px;">PENDIENTE</div>
-            <div style="font-size:26px; font-weight:700; color:#c62828; margin-top:4px;">{{ conteo_estado.Pendiente }}</div>
+            <div style="font-size:26px; font-weight:700; color:#c62828; margin-top:4px;">{{ conteo_modulos_pendientes }}</div>
             <div style="font-size:12px; color:#666; margin-top:4px;">Falta de módulo</div>
             <br>
             <hr>
@@ -318,7 +318,8 @@
                 <option value="">— Todos —</option>
                 <option value="Pagado" {% if filtros.estado == 'Pagado' %}selected{% endif %}>Pagado</option>
                 <option value="Parcial" {% if filtros.estado == 'Parcial' %}selected{% endif %}>Parcial</option>
-                <option value="Pendiente" {% if filtros.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+                <option value="Pendiente" {% if filtros.estado == 'Pendiente' %}selected{% endif %}>Pendiente financiero (sin abonos)</option>
+                <option value="ModuloPendiente" {% if filtros.estado == 'ModuloPendiente' %}selected{% endif %}>Falta de módulo</option>
                 <option value="Retiro" {% if filtros.estado == 'Retiro' %}selected{% endif %}>Retiro voluntario</option>
             </select>
         </div>

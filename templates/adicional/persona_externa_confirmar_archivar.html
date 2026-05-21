@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}Archivar Persona Externa{% endblock %}
+
+{% block extra_head %}
+<style>
+    .archive-card { max-width: 580px; margin: 16px 0; }
+    .archive-hero {
+        background: linear-gradient(135deg, #fff8e1, #fffde7);
+        border: 1px solid #ffe082;
+        border-radius: 14px;
+        padding: 24px;
+        position: relative;
+        overflow: hidden;
+    }
+    .archive-hero::before {
+        content: '🗄️';
+        position: absolute;
+        right: 20px; top: 50%;
+        transform: translateY(-50%);
+        font-size: 64px;
+        opacity: 0.12;
+    }
+    .persona-name { font-size: 20px; font-weight: 700; color: #1a237e; margin-bottom: 6px; }
+    .persona-meta { font-size: 13px; color: #666; display: flex; flex-wrap: wrap; gap: 12px; }
+    .persona-meta span { display: flex; align-items: center; gap: 4px; }
+    .ad-list { margin-top: 14px; border-top: 1px solid #ffe082; padding-top: 12px; }
+    .ad-item {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 8px 12px; border-radius: 8px; margin-bottom: 6px;
+        background: rgba(255,255,255,0.7); border: 1px solid #fdd835;
+        font-size: 13px;
+    }
+    .info-box {
+        background: #e8f5e9; border-left: 4px solid #43a047;
+        border-radius: 8px; padding: 14px 16px;
+        margin: 18px 0; font-size: 13.5px;
+        color: #2e7d32; line-height: 1.6;
+    }
+    .btn-archive {
+        background: linear-gradient(135deg, #e65100, #ef6c00);
+        color: #fff; border: none;
+        padding: 10px 22px; border-radius: 8px;
+        font-size: 14px; font-weight: 600; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 8px;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(230,81,0,0.3);
+    }
+    .btn-archive:hover {
+        background: linear-gradient(135deg, #bf360c, #e65100);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px rgba(230,81,0,0.4);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:personas_externas_lista' %}">Personas Externas</a> &nbsp;›&nbsp; Archivar
+</div>
+
+<div class="archive-card">
+    <h2 class="page-title" style="color:#e65100;">🗄️ Archivar Persona Externa</h2>
+    <p class="page-subtitle">
+        Se archivará la persona junto con todos sus adicionales. Quedarán en el historial permanente.
+    </p>
+
+    <div class="archive-hero">
+        <div class="persona-name">{{ persona.nombre_completo }}</div>
+        <div class="persona-meta">
+            {% if persona.cedula %}<span>🪪 {{ persona.cedula }}</span>{% endif %}
+            {% if persona.celular %}<span>📱 {{ persona.celular }}</span>{% endif %}
+            {% if persona.correo %}<span>📧 {{ persona.correo }}</span>{% endif %}
+            {% if persona.ciudad %}<span>🏙 {{ persona.ciudad }}</span>{% endif %}
+        </div>
+
+        {% if persona.adicionales.exists %}
+        <div class="ad-list">
+            <div style="font-size: 11px; font-weight: 700; color: #e65100; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">
+                {{ persona.adicionales.count }} adicional(es) que se archivarán:
+            </div>
+            {% for ad in persona.adicionales.all %}
+            <div class="ad-item">
+                <span>{{ ad.tipo_icono }} {{ ad.get_tipo_adicional_display }}</span>
+                <span style="color: #888;">{{ ad.fecha|date:"d/m/Y" }}</span>
+                <span style="font-weight: 700; color: #2e7d32;">${{ ad.valor|floatformat:2 }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div style="margin-top:14px; font-size:13px; color:#999; font-style:italic;">Sin adicionales registrados.</div>
+        {% endif %}
+    </div>
+
+    <div class="info-box">
+        ✅ <strong>El registro no se eliminará.</strong> Tanto la persona como sus adicionales pasarán al
+        <strong>Historial</strong> donde podrás consultarlos desde <em>Archivo → Adicionales</em>.
+    </div>
+
+    <form method="post" style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
+        {% csrf_token %}
+        <a href="{% url 'academia:personas_externas_lista' %}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn-archive">
+            🗄️ Sí, archivar
+        </button>
+    </form>
+</div>
+{% endblock %}

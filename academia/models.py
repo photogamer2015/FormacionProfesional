@@ -1766,6 +1766,65 @@ class EstudianteArchivado(models.Model):
     def __str__(self):
         return f'{self.cedula} — {self.nombre_completo} (archivado)'
 
+
+class AdicionalArchivado(models.Model):
+    """Snapshot completo de un registro Adicional al momento del cierre."""
+
+    cierre = models.ForeignKey(
+        CierreCurso, on_delete=models.CASCADE, related_name='adicionales_archivados',
+        null=True, blank=True,
+        help_text='Cierre asociado (puede ser nulo si se archivó al limpiar directorio).'
+    )
+    adicional_original_id = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='ID del adicional original (referencia auditiva).'
+    )
+
+    # ── Datos del adicional ──
+    tipo_adicional = models.CharField(max_length=30)
+    tipo_adicional_label = models.CharField(max_length=50, blank=True)
+    
+    # ── Datos de la persona ──
+    persona_nombre = models.CharField(max_length=200, blank=True)
+    persona_cedula = models.CharField(max_length=20, blank=True)
+    persona_celular = models.CharField(max_length=30, blank=True)
+    origen_label = models.CharField(max_length=30, blank=True)
+
+    # ── Curso / Detalle ──
+    curso_nombre = models.CharField(max_length=150, blank=True)
+    modalidad = models.CharField(max_length=20, blank=True)
+    talla_camiseta = models.CharField(max_length=4, blank=True)
+    numero_modulo = models.PositiveIntegerField(null=True, blank=True)
+
+    # ── Pago ──
+    fecha = models.DateField()
+    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    metodo_pago = models.CharField(max_length=20, blank=True)
+    metodo_pago_label = models.CharField(max_length=40, blank=True)
+    banco = models.CharField(max_length=30, blank=True)
+    banco_label = models.CharField(max_length=40, blank=True)
+    numero_recibo = models.CharField(max_length=30, blank=True)
+    
+    observaciones = models.TextField(blank=True)
+
+    # ── Auditoría ──
+    registrado_por_nombre = models.CharField(max_length=120, blank=True)
+    creado_original = models.DateTimeField(null=True, blank=True)
+    archivado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Adicional archivado'
+        verbose_name_plural = 'Adicionales archivados'
+        ordering = ['-archivado_en', '-fecha']
+        indexes = [
+            models.Index(fields=['persona_cedula']),
+            models.Index(fields=['cierre']),
+        ]
+
+    def __str__(self):
+        return f'{self.tipo_adicional_label} — {self.persona_nombre} (${self.valor}) (archivado)'
+
+
 # ─────────────────────────────────────────────────────────
 # Cierre Administrativo (cierre financiero del periodo)
 # ─────────────────────────────────────────────────────────

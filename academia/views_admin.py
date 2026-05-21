@@ -21,8 +21,8 @@ from django.views.decorators.http import require_POST
 
 from .forms import EgresoForm
 from .models import (
-    Abono, AbonoArchivado, Adicional, CategoriaEgreso, CierreAdministrativo,
-    CierreCurso, Comprobante, Egreso, Matricula,
+    Abono, AbonoArchivado, Adicional, AdicionalArchivado, CategoriaEgreso,
+    CierreAdministrativo, CierreCurso, Comprobante, Egreso, Matricula,
 )
 from .permisos import admin_requerido
 
@@ -74,15 +74,21 @@ def _ingresos_periodo(desde, hasta):
         matricula__isnull=True,
     ).aggregate(s=Sum('pago_abono'))['s'] or Decimal('0.00')
 
-    adicionales = Adicional.objects.filter(
+    adicionales_vivos = Adicional.objects.filter(
         fecha__gte=desde, fecha__lte=hasta
     ).aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
+    adicionales_archivados = AdicionalArchivado.objects.filter(
+        fecha__gte=desde, fecha__lte=hasta
+    ).aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
+    adicionales = adicionales_vivos + adicionales_archivados
 
     return {
         'abonos': abonos,
         'abonos_archivados': abonos_archivados,
         'ventas': ventas,
         'adicionales': adicionales,
+        'adicionales_vivos': adicionales_vivos,
+        'adicionales_archivados': adicionales_archivados,
         'total': abonos + abonos_archivados + ventas + adicionales,
     }
 
@@ -113,34 +119,82 @@ def _cierres_curso_periodo(desde, hasta):
 
 def _adicionales_periodo(desde, hasta):
     """
-    Estadísticas de los Adicionales registrados en el rango.
+    Estadísticas de Adicionales registrados en el rango.
+    Incluye activos y archivados para que el dashboard no pierda ingresos
+    después de ejecutar un cierre adicional.
     """
     qs = Adicional.objects.filter(fecha__gte=desde, fecha__lte=hasta)
-    total = qs.aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
-    count = qs.count()
-    interno = qs.filter(estudiante__isnull=False).aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
-    externo = qs.filter(persona_externa__isnull=False).aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
+    arch_qs = AdicionalArchivado.objects.filter(fecha__gte=desde, fecha__lte=hasta)
+
+    total_vivos = qs.aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
+    total_archivados = arch_qs.aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
+    total = total_vivos + total_archivados
+    count = qs.count() + arch_qs.count()
+    interno = (
+        (qs.filter(estudiante__isnull=False).aggregate(s=Sum('valor'))['s'] or Decimal('0.00'))
+        + (arch_qs.filter(origen_label='Estudiante interno').aggregate(s=Sum('valor'))['s'] or Decimal('0.00'))
+    )
+    externo = (
+        (qs.filter(persona_externa__isnull=False).aggregate(s=Sum('valor'))['s'] or Decimal('0.00'))
+        + (arch_qs.filter(origen_label='Persona externa').aggregate(s=Sum('valor'))['s'] or Decimal('0.00'))
+    )
 
     # Desglose por tipo
     por_tipo_qs = (qs.values('tipo_adicional')
                      .annotate(total=Sum('valor'), count=Count('id'))
                      .order_by('-total'))
+    por_tipo_arch_qs = (
+        arch_qs.values('tipo_adicional')
+        .annotate(total=Sum('valor'), count=Count('id'))
+        .order_by('-total')
+    )
     tipos_dict = {t[0]: t[1] for t in Adicional.TIPOS_ADICIONAL}
-    por_tipo = []
+    por_tipo_map = {}
     for r in por_tipo_qs:
-        por_tipo.append({
-            'codigo': r['tipo_adicional'],
-            'label': tipos_dict.get(r['tipo_adicional'], r['tipo_adicional']),
+        codigo = r['tipo_adicional']
+        por_tipo_map[codigo] = {
+            'codigo': codigo,
+            'label': tipos_dict.get(codigo, codigo),
             'total': r['total'] or Decimal('0.00'),
             'count': r['count'] or 0,
+        }
+    for r in por_tipo_arch_qs:
+        codigo = r['tipo_adicional']
+        item = por_tipo_map.setdefault(codigo, {
+            'codigo': codigo,
+            'label': tipos_dict.get(codigo, codigo),
+            'total': Decimal('0.00'),
+            'count': 0,
         })
+        item['total'] += r['total'] or Decimal('0.00')
+        item['count'] += r['count'] or 0
+    por_tipo = sorted(por_tipo_map.values(), key=lambda item: item['total'], reverse=True)
 
     return {
         'total': total,
+        'activos': total_vivos,
+        'archivados': total_archivados,
         'count': count,
         'interno': interno,
         'externo': externo,
         'por_tipo': por_tipo,
+    }
+
+
+def _adicionales_archivados_periodo(desde, hasta):
+    """Adicionales movidos al archivo durante el mes seleccionado."""
+    qs = AdicionalArchivado.objects.filter(
+        archivado_en__date__gte=desde,
+        archivado_en__date__lte=hasta,
+    )
+    total = qs.aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
+    interno = qs.filter(origen_label='Estudiante interno').aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
+    externo = qs.filter(origen_label='Persona externa').aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
+    return {
+        'total': total,
+        'count': qs.count(),
+        'interno': interno,
+        'externo': externo,
     }
 
 
@@ -300,6 +354,7 @@ def admin_dashboard(request):
 
     # ── NUEVO: Estadísticas de Adicionales del mes ──
     adicionales_mes = _adicionales_periodo(desde, hasta)
+    adicionales_archivados_mes = _adicionales_archivados_periodo(desde, hasta)
 
     # ── Comparación con mes anterior ──
     if mes == 1:
@@ -370,7 +425,10 @@ def admin_dashboard(request):
     total_ventas_hist = Comprobante.objects.filter(
         matricula__isnull=True
     ).aggregate(s=Sum('pago_abono'))['s'] or Decimal('0.00')
-    total_adicionales_hist = Adicional.objects.aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
+    total_adicionales_hist = (
+        (Adicional.objects.aggregate(s=Sum('valor'))['s'] or Decimal('0.00'))
+        + (AdicionalArchivado.objects.aggregate(s=Sum('valor'))['s'] or Decimal('0.00'))
+    )
     total_egresos_hist = Egreso.objects.aggregate(s=Sum('monto'))['s'] or Decimal('0.00')
     total_ingresos_hist = (
         total_abonos_hist + total_abonos_arch_hist
@@ -468,6 +526,7 @@ def admin_dashboard(request):
         'recuperaciones_mes': recuperaciones_mes,
         # ★ NUEVO: Adicionales del mes (KPI con +)
         'adicionales_mes': adicionales_mes,
+        'adicionales_archivados_mes': adicionales_archivados_mes,
         'var_adicionales': variacion(adicionales_mes['total'], adic_prev),
         # ★ NUEVO: Cierres de curso y administrativos
         'cierres_curso_mes': cierres_curso_mes,

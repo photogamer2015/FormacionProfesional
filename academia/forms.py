@@ -2,8 +2,8 @@ from django import forms
 from django.db.models import Q
 from .models import (
     Abono, Adicional, CategoriaEgreso, Categoria, Comprobante, Curso, Egreso,
-    Estudiante, JornadaCurso, Matricula, PersonaExterna, RecuperacionPendiente,
-    Sede,
+    Estudiante, EstudianteArchivado, JornadaCurso, Matricula, MatriculaArchivada,
+    PersonaExterna, RecuperacionPendiente, Sede,
 )
 
 
@@ -850,6 +850,12 @@ class PersonaExternaForm(forms.ModelForm):
                 'Esta cédula ya pertenece a un ESTUDIANTE matriculado. '
                 'Debes registrar el adicional en la opción "Estudiante Interno".'
             )
+        if _buscar_estudiante_archivado(cedula):
+            raise forms.ValidationError(
+                'Esta cédula pertenece a un ESTUDIANTE archivado. '
+                'Debes registrar el adicional en la opción "Estudiante Interno"; '
+                'el sistema lo recuperará del archivo al guardar.'
+            )
 
         # Si estamos creando, validar que no exista otra persona externa
         if not self.instance.pk and PersonaExterna.objects.filter(cedula=cedula).exists():
@@ -972,6 +978,58 @@ class _AdicionalBaseForm(forms.ModelForm):
         return cleaned
 
 
+def _nivel_formacion_codigo(valor):
+    valor = (valor or '').strip()
+    if not valor:
+        return ''
+    for codigo, label in Estudiante.NIVELES_FORMACION:
+        if valor == codigo or valor == label:
+            return codigo
+    return ''
+
+
+def _edad_entera(valor):
+    if valor in (None, ''):
+        return None
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def _buscar_estudiante_archivado(cedula):
+    archivado = (
+        EstudianteArchivado.objects
+        .filter(cedula=cedula)
+        .order_by('-archivado_en')
+        .first()
+    )
+    if archivado:
+        return archivado
+    return (
+        MatriculaArchivada.objects
+        .filter(cedula=cedula)
+        .order_by('-archivado_en')
+        .first()
+    )
+
+
+def _crear_estudiante_desde_archivo(archivado):
+    ciudad = getattr(archivado, 'ciudad', getattr(archivado, 'ciudad_estudiante', '')) or ''
+    titulo = getattr(archivado, 'titulo_profesional', '') or ''
+    return Estudiante.objects.create(
+        cedula=archivado.cedula,
+        apellidos=archivado.apellidos,
+        nombres=archivado.nombres,
+        edad=_edad_entera(getattr(archivado, 'edad', None)),
+        correo=archivado.correo or '',
+        celular=archivado.celular or '',
+        nivel_formacion=_nivel_formacion_codigo(getattr(archivado, 'nivel_formacion', '')),
+        titulo_profesional=titulo,
+        ciudad=ciudad,
+    )
+
+
 class AdicionalInternoForm(_AdicionalBaseForm):
     """
     Formulario para crear un Adicional para un ESTUDIANTE INTERNO de la academia.
@@ -996,16 +1054,30 @@ class AdicionalInternoForm(_AdicionalBaseForm):
         try:
             est = Estudiante.objects.get(cedula=cedula)
         except Estudiante.DoesNotExist:
-            raise forms.ValidationError(
-                'No existe un estudiante con esa cédula. '
-                'Si la persona no está matriculada, registra el adicional como "Persona externa".'
-            )
+            archivado = _buscar_estudiante_archivado(cedula)
+            if not archivado:
+                raise forms.ValidationError(
+                    'No existe un estudiante con esa cédula. '
+                    'Si la persona no está matriculada, registra el adicional como "Persona externa".'
+                )
+            self.estudiante_obj = None
+            self.estudiante_archivado_obj = archivado
+            return cedula
         self.estudiante_obj = est
+        self.estudiante_archivado_obj = None
         return cedula
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        instance.estudiante = getattr(self, 'estudiante_obj', None)
+        estudiante = getattr(self, 'estudiante_obj', None)
+        if estudiante is None:
+            archivado = getattr(self, 'estudiante_archivado_obj', None)
+            if archivado:
+                estudiante = (
+                    Estudiante.objects.filter(cedula=archivado.cedula).first()
+                    or _crear_estudiante_desde_archivo(archivado)
+                )
+        instance.estudiante = estudiante
         instance.persona_externa = None
         if commit:
             instance.save()

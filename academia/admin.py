@@ -3,7 +3,7 @@ from .models import (
     Adicional, Categoria, Comprobante, Curso, JornadaCurso,
     Estudiante, Matricula, PersonaExterna, RecuperacionPendiente,
     AssistantQueryLog, CierreCurso, MatriculaArchivada, AbonoArchivado,
-    EstudianteArchivado, CierreAdministrativo, Sede,
+    EstudianteArchivado, AdicionalArchivado, CierreAdministrativo, Sede,
 )
 
 
@@ -327,6 +327,19 @@ class EstudianteArchivadoAdmin(admin.ModelAdmin):
     search_fields = ('cedula', 'apellidos', 'nombres', 'correo', 'celular')
     readonly_fields = [f.name for f in EstudianteArchivado._meta.fields]
     list_select_related = ('cierre',)
+
+
+@admin.register(AdicionalArchivado)
+class AdicionalArchivadoAdmin(admin.ModelAdmin):
+    list_display = (
+        'fecha', 'tipo_adicional_label', 'persona_nombre', 'curso_nombre',
+        'modalidad', 'valor', 'metodo_pago_label', 'archivado_en', 'cierre',
+    )
+    list_filter = ('tipo_adicional', 'modalidad', 'archivado_en')
+    search_fields = ('persona_cedula', 'persona_nombre', 'persona_celular', 'curso_nombre', 'numero_recibo')
+    readonly_fields = [f.name for f in AdicionalArchivado._meta.fields]
+    list_select_related = ('cierre',)
+
 
 
 @admin.register(CierreAdministrativo)

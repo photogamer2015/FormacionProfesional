@@ -21,13 +21,34 @@ from django.db import transaction
 from django.db.models import Q, Sum, Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from .forms import (
     AdicionalInternoForm, AdicionalExternoForm,
     AdicionalSupletorioRapidoForm, PersonaExternaForm,
 )
-from .models import Adicional, Estudiante, Matricula, PersonaExterna
+from .models import (
+    Adicional, Estudiante, EstudianteArchivado, Matricula, MatriculaArchivada,
+    PersonaExterna,
+)
 from .permisos import matricula_requerida, admin_requerido
+
+
+def _buscar_estudiante_archivado(cedula):
+    archivado = (
+        EstudianteArchivado.objects
+        .filter(cedula=cedula)
+        .order_by('-archivado_en')
+        .first()
+    )
+    if archivado:
+        return archivado
+    return (
+        MatriculaArchivada.objects
+        .filter(cedula=cedula)
+        .order_by('-archivado_en')
+        .first()
+    )
 
 
 # ─────────────────────────────────────────────────────────
@@ -244,6 +265,95 @@ def adicional_eliminar(request, pk):
     })
 
 
+@matricula_requerida
+@transaction.atomic
+def adicional_archivar(request, pk):
+    """Archiva un adicional manualmente (lo mueve a AdicionalArchivado y lo borra)."""
+    ad = get_object_or_404(Adicional, pk=pk)
+    if request.method == 'POST':
+        nombre = ad.persona_nombre
+        tipo = ad.get_tipo_adicional_display()
+        from .views_cierre import _snapshot_adicional
+        _snapshot_adicional(ad, None)
+        ad.delete()
+        messages.success(request, f'Adicional archivado correctamente: {tipo} de {nombre}.')
+        return redirect('academia:adicional_lista')
+
+    return render(request, 'adicional/confirmar_archivar.html', {
+        'adicional': ad,
+    })
+
+
+@admin_requerido
+@transaction.atomic
+def adicional_cierre(request):
+    """Cierre masivo de adicionales: los mueve al archivo permanente."""
+    origen = (request.GET.get('origen') or request.POST.get('origen') or '').strip()
+    qs = Adicional.objects.select_related(
+        'estudiante', 'persona_externa', 'curso', 'registrado_por',
+    )
+
+    if origen == 'interno':
+        qs = qs.filter(estudiante__isnull=False)
+        origen_label = 'interno'
+        titulo = 'Cierre adicional interno'
+    elif origen == 'externo':
+        qs = qs.filter(persona_externa__isnull=False)
+        origen_label = 'externo'
+        titulo = 'Cierre adicional externo'
+    else:
+        origen = ''
+        origen_label = 'todos'
+        titulo = 'Cierre adicional'
+
+    total_registros = qs.count()
+    total_valor = qs.aggregate(s=Sum('valor'))['s'] or Decimal('0.00')
+    desglose = (
+        qs.values('tipo_adicional')
+        .annotate(count=Count('id'), total=Sum('valor'))
+        .order_by('-total')
+    )
+    tipos_dict = {t[0]: t[1] for t in Adicional.TIPOS_ADICIONAL}
+    desglose_tipos = [
+        {
+            'tipo': row['tipo_adicional'],
+            'label': tipos_dict.get(row['tipo_adicional'], row['tipo_adicional']),
+            'count': row['count'],
+            'total': row['total'] or Decimal('0.00'),
+        }
+        for row in desglose
+    ]
+
+    if request.method == 'POST':
+        adicionales = list(qs)
+        if not adicionales:
+            messages.warning(request, 'No hay adicionales activos para cerrar.')
+            return redirect('academia:adicional_lista')
+
+        from .views_cierre import _snapshot_adicional
+        for ad in adicionales:
+            _snapshot_adicional(ad, None)
+        Adicional.objects.filter(pk__in=[ad.pk for ad in adicionales]).delete()
+
+        messages.success(
+            request,
+            f'Cierre adicional completado: {len(adicionales)} registro(s) archivado(s).'
+        )
+        if origen in ('interno', 'externo'):
+            return redirect(f'{reverse("academia:adicionales_archivados_lista")}?origen={origen}')
+        return redirect('academia:adicionales_archivados_lista')
+
+    return render(request, 'adicional/cierre_confirmar.html', {
+        'titulo': titulo,
+        'origen': origen,
+        'origen_label': origen_label,
+        'total_registros': total_registros,
+        'total_valor': total_valor,
+        'desglose_tipos': desglose_tipos,
+        'adicionales': qs.order_by('-fecha', '-creado')[:80],
+    })
+
+
 # ─────────────────────────────────────────────────────────
 # Personas Externas — CRUD
 # ─────────────────────────────────────────────────────────
@@ -291,7 +401,14 @@ def persona_externa_crear(request):
                 return redirect(f'{base}?cedula={persona.cedula}')
             return redirect('academia:personas_externas_lista')
     else:
-        form = PersonaExternaForm()
+        initial = {
+            'cedula': request.GET.get('cedula', ''),
+            'nombres': request.GET.get('nombres', ''),
+            'apellidos': request.GET.get('apellidos', ''),
+            'correo': request.GET.get('correo', ''),
+            'celular': request.GET.get('celular', ''),
+        }
+        form = PersonaExternaForm(initial=initial)
 
     return render(request, 'adicional/persona_externa_form.html', {
         'form': form,
@@ -346,6 +463,28 @@ def persona_externa_eliminar(request, pk):
     })
 
 
+@matricula_requerida
+@transaction.atomic
+def persona_externa_archivar(request, pk):
+    """Archiva todos los adicionales de una persona externa y elimina a la persona."""
+    persona = get_object_or_404(PersonaExterna, pk=pk)
+    if request.method == 'POST':
+        nombre = persona.nombre_completo
+        adicionales = persona.adicionales.all()
+        count = adicionales.count()
+        from .views_cierre import _snapshot_adicional
+        for ad in adicionales:
+            _snapshot_adicional(ad, None)
+            ad.delete()
+        persona.delete()
+        messages.success(request, f'Persona externa archivada correctamente: {nombre} ({count} adicionales archivados).')
+        return redirect('academia:personas_externas_lista')
+
+    return render(request, 'adicional/persona_externa_confirmar_archivar.html', {
+        'persona': persona,
+    })
+
+
 # ─────────────────────────────────────────────────────────
 # API para autocompletar
 # ─────────────────────────────────────────────────────────
@@ -354,27 +493,44 @@ def persona_externa_eliminar(request, pk):
 def api_estudiante_existe(request, cedula):
     """Endpoint AJAX: devuelve datos del estudiante por cédula (para autocompletar)."""
     try:
-        est = Estudiante.objects.filter(cedula=cedula.strip()).first()
+        cedula = cedula.strip()
+        est = Estudiante.objects.filter(cedula=cedula).first()
         if est:
             return JsonResponse({
                 'existe': True,
+                'desde_archivo': False,
                 'apellidos': est.apellidos,
                 'nombres': est.nombres,
                 'correo': est.correo or '',
                 'celular': est.celular or '',
                 'ciudad': est.ciudad or '',
             })
-            
+
+        # Si fue archivado por cierre de curso, sigue siendo un estudiante interno:
+        # se muestra aquí y el formulario lo recupera al guardar el adicional.
+        est_arch = _buscar_estudiante_archivado(cedula)
+        if est_arch:
+            ciudad = getattr(est_arch, 'ciudad', getattr(est_arch, 'ciudad_estudiante', '')) or ''
+            return JsonResponse({
+                'existe': True,
+                'desde_archivo': True,
+                'apellidos': est_arch.apellidos,
+                'nombres': est_arch.nombres,
+                'correo': est_arch.correo or '',
+                'celular': est_arch.celular or '',
+                'ciudad': ciudad,
+            })
+
         # Check if it's actually a Persona Externa
-        p = PersonaExterna.objects.filter(cedula=cedula.strip()).first()
+        p = PersonaExterna.objects.filter(cedula=cedula).first()
         if p:
             return JsonResponse({
                 'existe': False,
                 'es_externa': True,
                 'nombre_externo': p.nombre_completo,
             })
-            
-        return JsonResponse({'existe': False, 'es_externa': False})
+
+        return JsonResponse({'existe': False, 'es_externa': False, 'es_archivado': False})
     except Exception as e:
         return JsonResponse({'existe': False, 'error': str(e)})
 
@@ -383,7 +539,8 @@ def api_estudiante_existe(request, cedula):
 def api_persona_externa(request, cedula):
     """Endpoint AJAX: devuelve datos de una persona externa por cédula."""
     try:
-        p = PersonaExterna.objects.filter(cedula=cedula.strip()).first()
+        cedula = cedula.strip()
+        p = PersonaExterna.objects.filter(cedula=cedula).first()
         if p:
             return JsonResponse({
                 'existe': True,
@@ -395,12 +552,21 @@ def api_persona_externa(request, cedula):
             })
         
         # Check if it's actually an Estudiante Interno
-        est = Estudiante.objects.filter(cedula=cedula.strip()).first()
+        est = Estudiante.objects.filter(cedula=cedula).first()
         if est:
             return JsonResponse({
                 'existe': False,
                 'es_estudiante': True,
                 'nombre_estudiante': est.nombre_completo,
+            })
+
+        est_arch = _buscar_estudiante_archivado(cedula)
+        if est_arch:
+            return JsonResponse({
+                'existe': False,
+                'es_estudiante': True,
+                'es_archivado': True,
+                'nombre_estudiante': est_arch.nombre_completo,
             })
             
         return JsonResponse({'existe': False, 'es_estudiante': False})

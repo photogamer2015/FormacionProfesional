@@ -16,7 +16,14 @@
             <br>{{ count }} registrada{{ count|pluralize }}.
         </p>
     </div>
-    <a href="{% url 'academia:persona_externa_crear' %}" class="btn btn-success">＋ Registrar Persona Externa</a>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="{% url 'academia:adicionales_archivados_lista' %}?origen=externo" class="btn btn-secondary">🗄️ Externos archivados</a>
+        <a href="{% url 'academia:adicional_cierre' %}?origen=externo" class="btn"
+           style="background:linear-gradient(135deg,#ff3d00,#d50000); color:#fff; font-weight:700;">
+            🔒 Cierre adicional externo
+        </a>
+        <a href="{% url 'academia:persona_externa_crear' %}" class="btn btn-success">＋ Registrar Persona Externa</a>
+    </div>
 </div>
 
 {# ── Búsqueda ── #}
@@ -62,10 +69,13 @@
                        class="btn btn-success btn-sm" title="Registrar adicional para esta persona">＋</a>
                     <a href="{% url 'academia:persona_externa_editar' p.pk %}"
                        class="btn btn-warning btn-sm" title="Editar">✎</a>
+                    <a href="{% url 'academia:persona_externa_archivar' p.pk %}"
+                       class="btn btn-sm" title="Archivar persona y sus adicionales"
+                       style="background:linear-gradient(135deg,#e65100,#ef6c00); color:#fff; font-size:11px; padding:4px 9px;">🗄️</a>
                     <form method="post" action="{% url 'academia:persona_externa_eliminar' p.pk %}" style="display:inline;">
                         {% csrf_token %}
-                        <button type="button" class="btn btn-danger btn-sm" title="Eliminar"
-                                onclick="confirmarAccion(this.form, '¿Eliminar a {{ p.nombre_completo|escapejs }}?', 'danger')">🗑</button>
+                        <button type="button" class="btn btn-danger btn-sm" title="Eliminar definitivamente"
+                                onclick="confirmarAccion(this.form, '¿Eliminar DEFINITIVAMENTE a {{ p.nombre_completo|escapejs }}? Esta acción no se puede deshacer.', 'danger')">🗑</button>
                     </form>
                 </td>
             </tr>

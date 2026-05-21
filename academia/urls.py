@@ -181,10 +181,16 @@ urlpatterns = [
          views_adicional.adicional_crear_interno, name='adicional_crear_interno'),
     path('adicional/registrar/externo/',
          views_adicional.adicional_crear_externo, name='adicional_crear_externo'),
+    path('adicional/cierre/',
+         views_adicional.adicional_cierre, name='adicional_cierre'),
     path('adicional/<int:pk>/editar/',
          views_adicional.adicional_editar, name='adicional_editar'),
     path('adicional/<int:pk>/eliminar/',
          views_adicional.adicional_eliminar, name='adicional_eliminar'),
+    path('adicional/<int:pk>/archivar/',
+         views_adicional.adicional_archivar, name='adicional_archivar'),
+    path('adicional/archivados/',
+         views_cierre.adicionales_archivados_lista, name='adicionales_archivados_lista'),
 
     # ── Personas Externas ──
     path('adicional/personas-externas/',
@@ -195,6 +201,8 @@ urlpatterns = [
          views_adicional.persona_externa_editar, name='persona_externa_editar'),
     path('adicional/personas-externas/<int:pk>/eliminar/',
          views_adicional.persona_externa_eliminar, name='persona_externa_eliminar'),
+    path('adicional/personas-externas/<int:pk>/archivar/',
+         views_adicional.persona_externa_archivar, name='persona_externa_archivar'),
 
     # ── API auxiliares para autocompletar ──
     path('api/adicional/estudiante/<str:cedula>/',

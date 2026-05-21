@@ -176,6 +176,11 @@
                                href="{% url c.url_admin %}?anio={{ m.anio }}&mes={{ m.mes }}">
                                 🧾 Cortes de caja ({{ m.total_cierres }})
                             </a>
+                        {% elif c.clave == 'adicional' %}
+                            <a class="month-link"
+                               href="{% url c.url_adicional %}?anio={{ m.anio }}&mes={{ m.mes }}">
+                                ➕ Adicionales archivados ({{ m.total_cierres }})
+                            </a>
                         {% endif %}
                     </div>
                 </div>

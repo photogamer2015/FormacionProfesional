@@ -26,8 +26,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import (
-    Abono, AbonoArchivado, CierreAdministrativo, CierreCurso, Curso, Estudiante,
-    EstudianteArchivado, JornadaCurso, Matricula, MatriculaArchivada,
+    Abono, AbonoArchivado, Adicional, CierreAdministrativo, CierreCurso, Curso,
+    Estudiante, EstudianteArchivado, JornadaCurso, Matricula, MatriculaArchivada,
 )
 from .permisos import admin_requerido, matricula_requerida
 
@@ -226,6 +226,37 @@ def _snapshot_estudiante(estudiante, cierre):
     )
 
 
+def _snapshot_adicional(adicional, cierre):
+    """Crea un AdicionalArchivado a partir de un Adicional vivo."""
+    from .models import AdicionalArchivado
+    return AdicionalArchivado.objects.create(
+        cierre=cierre,
+        adicional_original_id=adicional.pk,
+        tipo_adicional=adicional.tipo_adicional,
+        tipo_adicional_label=adicional.get_tipo_adicional_display() if hasattr(adicional, 'get_tipo_adicional_display') else adicional.tipo_adicional,
+        persona_nombre=adicional.persona_nombre,
+        persona_cedula=adicional.persona_cedula,
+        persona_celular=adicional.persona_celular,
+        origen_label=adicional.origen_label,
+        curso_nombre=adicional.curso.nombre if adicional.curso else '',
+        modalidad=adicional.modalidad,
+        talla_camiseta=adicional.talla_camiseta,
+        numero_modulo=adicional.numero_modulo,
+        fecha=adicional.fecha,
+        valor=adicional.valor,
+        metodo_pago=adicional.metodo_pago,
+        metodo_pago_label=adicional.get_metodo_pago_display() if hasattr(adicional, 'get_metodo_pago_display') else adicional.metodo_pago,
+        banco=adicional.banco,
+        banco_label=adicional.get_banco_display() if hasattr(adicional, 'get_banco_display') and adicional.banco else '',
+        numero_recibo=adicional.numero_recibo,
+        observaciones=adicional.observaciones,
+        registrado_por_nombre=(
+            adicional.registrado_por.get_full_name() or adicional.registrado_por.username
+            if adicional.registrado_por_id else ''
+        ),
+        creado_original=adicional.creado,
+    )
+
 # ═════════════════════════════════════════════════════════════════
 # Vista previa del cierre
 # ═════════════════════════════════════════════════════════════════
@@ -324,19 +355,27 @@ def cierre_ejecutar(request, curso_pk):
 
             Matricula.objects.filter(pk__in=ids_a_borrar).delete()
 
+            if not jornada:
+                adicionales_curso = Adicional.objects.filter(curso=curso)
+                for ad in adicionales_curso:
+                    _snapshot_adicional(ad, cierre)
+                adicionales_curso.delete()
+
             # ── Limpieza opcional del directorio de estudiantes ──
             estudiantes_archivados = 0
             if limpiar_directorio and estudiantes_a_evaluar_ids:
-                # Tras borrar las matrículas, ¿cuáles estudiantes quedaron sin matrículas Y sin adicionales?
-                # No tocamos estudiantes con Adicional protegido (exámenes supletorios cobrados, etc.)
+                # Tras borrar las matrículas, ¿cuáles estudiantes quedaron sin matrículas?
                 huerfanos = Estudiante.objects.filter(
                     pk__in=estudiantes_a_evaluar_ids,
                     matriculas__isnull=True,
-                    adicionales__isnull=True,
                 ).distinct()
 
                 for est in huerfanos:
                     _snapshot_estudiante(est, cierre)
+                    # Archivar también sus adicionales sueltos
+                    for ad in est.adicionales.all():
+                        _snapshot_adicional(ad, cierre)
+                        ad.delete()
                     estudiantes_archivados += 1
 
                 # Borrar los huérfanos del directorio vivo
@@ -515,18 +554,27 @@ def cierre_global_ejecutar(request, modalidad):
                     ids.append(m.pk)
                 Matricula.objects.filter(pk__in=ids).delete()
 
+                # Cierre global es de todo el curso, archivamos sus adicionales
+                adicionales_curso = Adicional.objects.filter(curso=curso)
+                for ad in adicionales_curso:
+                    _snapshot_adicional(ad, cierre)
+                adicionales_curso.delete()
+
             # ── Limpieza del directorio ──
             estudiantes_archivados_total = 0
             if limpiar_directorio and estudiantes_a_evaluar_ids:
                 huerfanos = Estudiante.objects.filter(
                     pk__in=estudiantes_a_evaluar_ids,
                     matriculas__isnull=True,
-                    adicionales__isnull=True,
                 ).distinct()
                 # Asignamos los snapshots al primer cierre creado (a modo de "ancla")
                 cierre_ancla = cierres_creados[0]
                 for est in huerfanos:
                     _snapshot_estudiante(est, cierre_ancla)
+                    # Archivar también sus adicionales sueltos
+                    for ad in est.adicionales.all():
+                        _snapshot_adicional(ad, cierre_ancla)
+                        ad.delete()
                     estudiantes_archivados_total += 1
                 huerfanos.delete()
 
@@ -664,6 +712,26 @@ def archivo_index(request):
     total_cierres_admin = CierreAdministrativo.objects.count()
 
     # ───────────────────────────────────────────────────────────────
+    # CARPETA ADICIONALES — agrupar adicionales archivados por mes
+    # ───────────────────────────────────────────────────────────────
+    from .models import AdicionalArchivado
+    periodos_adicional = defaultdict(int)
+    for ad in AdicionalArchivado.objects.all().only('archivado_en'):
+        key = (ad.archivado_en.year, ad.archivado_en.month)
+        periodos_adicional[key] += 1
+
+    meses_adicionales = []
+    for (anio, mes), n in sorted(periodos_adicional.items(), reverse=True):
+        meses_adicionales.append({
+            'anio': anio,
+            'mes': mes,
+            'etiqueta': f'{MESES_ES[mes]} {anio}',
+            'total_cierres': n,
+            'descripcion': f'{n} adicional(es)',
+        })
+    total_adicional_arch = AdicionalArchivado.objects.count()
+
+    # ───────────────────────────────────────────────────────────────
     # Carpetas finales para el template
     # ───────────────────────────────────────────────────────────────
     carpetas = [
@@ -680,6 +748,18 @@ def archivo_index(request):
             'url_estudiantes': 'academia:estudiantes_archivados_lista',
             'resumen': f'{total_cierres_curso + total_estudiantes_arch} registro(s) en {len(meses_estudiantes)} mes(es)',
             'vacio_msg': 'Aún no hay cursos cerrados ni estudiantes archivados.',
+            'visible': True,
+        },
+        {
+            'clave': 'adicional',
+            'titulo': 'Adicionales',
+            'icono': '➕',
+            'descripcion': 'Servicios adicionales archivados (camisas, certificados, etc).',
+            'color': '#ff9800',
+            'meses': meses_adicionales,
+            'url_adicional': 'academia:adicionales_archivados_lista',
+            'resumen': f'{total_adicional_arch} registro(s) en {len(meses_adicionales)} mes(es)',
+            'vacio_msg': 'Aún no hay adicionales archivados.',
             'visible': True,
         },
     ]
@@ -1191,3 +1271,59 @@ def estudiantes_archivados_export(request):
         f'{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx"'
     )
     return resp
+# ═════════════════════════════════════════════════════════════════
+# Adicionales archivados (historial)
+# ═════════════════════════════════════════════════════════════════
+
+@matricula_requerida
+def adicionales_archivados_lista(request):
+    """
+    Lista todos los adicionales archivados durante cierres de curso
+    o limpieza de estudiantes.
+    """
+    from .models import AdicionalArchivado
+    q = request.GET.get('q', '').strip()
+    cierre_id = request.GET.get('cierre', '').strip()
+    anio = request.GET.get('anio', '').strip()
+    mes = request.GET.get('mes', '').strip()
+    origen = request.GET.get('origen', '').strip()
+
+    qs = AdicionalArchivado.objects.select_related('cierre').order_by('-archivado_en', '-fecha')
+
+    if q:
+        qs = qs.filter(
+            Q(persona_cedula__icontains=q)
+            | Q(persona_nombre__icontains=q)
+            | Q(numero_recibo__icontains=q)
+            | Q(curso_nombre__icontains=q)
+        )
+    if cierre_id.isdigit():
+        qs = qs.filter(cierre_id=int(cierre_id))
+    if anio.isdigit():
+        qs = qs.filter(archivado_en__year=int(anio))
+    if mes.isdigit() and 1 <= int(mes) <= 12:
+        qs = qs.filter(archivado_en__month=int(mes))
+    if origen == 'interno':
+        qs = qs.filter(origen_label='Estudiante interno')
+    elif origen == 'externo':
+        qs = qs.filter(origen_label='Persona externa')
+
+    cierres_disponibles = CierreCurso.objects.filter(
+        adicionales_archivados__isnull=False
+    ).distinct().order_by('-fecha_cierre')
+
+    anios = sorted(
+        set(AdicionalArchivado.objects.dates('archivado_en', 'year').values_list('archivado_en__year', flat=True)),
+        reverse=True
+    )
+
+    total_filtrado = sum(ad.valor for ad in qs)
+
+    return render(request, 'adicional/archivados_lista.html', {
+        'adicionales': qs,
+        'cierres_disponibles': cierres_disponibles,
+        'anios': anios,
+        'count': qs.count(),
+        'total_filtrado': total_filtrado,
+        'filtros': {'q': q, 'cierre': cierre_id, 'anio': anio, 'mes': mes, 'origen': origen},
+    })

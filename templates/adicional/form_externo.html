@@ -142,6 +142,14 @@
     </div>
 
     <div style="display:flex; gap:10px; margin-top:24px; justify-content:flex-end;">
+        {% if modo == 'editar' and adicional %}
+        <a href="{% url 'academia:adicional_archivar' adicional.pk %}"
+           class="btn btn-sm"
+           title="Archivar este adicional"
+           style="background:linear-gradient(135deg,#e65100,#ef6c00); color:#fff;">
+            🗄️ Archivar
+        </a>
+        {% endif %}
         <a href="{% url 'academia:adicional_lista' %}" class="btn btn-secondary">Cancelar</a>
         <button type="submit" class="btn btn-primary">
             {% if modo == 'editar' %}💾 Guardar cambios{% else %}＋ Registrar adicional{% endif %}
@@ -192,11 +200,11 @@
                         </span>
                     `;
                 } else if (d.es_estudiante) {
-                    status.textContent = '⚠️ es estudiante';
+                    status.textContent = d.es_archivado ? '⚠️ estudiante archivado' : '⚠️ es estudiante';
                     status.style.color = '#e65100';
                     infoBox.innerHTML = `
                         <div style="background:#fff3e0; padding:10px; border-radius:6px; border-left:3px solid #ff9800;">
-                            <strong style="color:#e65100;">${d.nombre_estudiante}</strong> es un <strong style="color:#e65100;">ESTUDIANTE INTERNO</strong>.<br>
+                            <strong style="color:#e65100;">${d.nombre_estudiante}</strong> es un <strong style="color:#e65100;">${d.es_archivado ? 'ESTUDIANTE INTERNO ARCHIVADO' : 'ESTUDIANTE INTERNO'}</strong>.<br>
                             Debes registrar este adicional en la sección correcta.
                         </div>
                         <a href="{% url 'academia:adicional_crear_interno' %}?cedula=${encodeURIComponent(ced)}" class="btn btn-warning btn-sm" style="margin-top:8px;">Ir a Estudiante Interno</a>

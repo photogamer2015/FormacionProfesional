@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block title %}Adicionales Archivados{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:archivo_index' %}">Archivo</a> &nbsp;›&nbsp;
+    Adicionales archivados
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:8px;">
+    <div>
+        <h2 class="page-title">🗄️ Adicionales Archivados</h2>
+        <p class="page-subtitle">
+            Historial de servicios adicionales cobrados, archivados al cerrar cursos o limpiar estudiantes.
+            Total: {{ count }} registro{{ count|pluralize }} · <strong style="color:#2e7d32;">${{ total_filtrado|floatformat:2 }}</strong>
+        </p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="{% url 'academia:archivo_index' %}" class="btn btn-secondary">
+            ‹ Volver al archivo
+        </a>
+        <a href="{% url 'academia:adicional_lista' %}" class="btn btn-secondary">
+            📋 Adicionales vivos
+        </a>
+    </div>
+</div>
+
+{# ─── Filtros ─────────────────────── #}
+<div class="card-box" style="margin-bottom:20px; padding:16px;">
+    <form method="get" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px; align-items:end;">
+        <div>
+            <label class="form-label" style="font-size:11px;">Buscar</label>
+            <input type="text" name="q" value="{{ filtros.q }}" class="form-input"
+                   placeholder="Cédula, nombre, curso, recibo…">
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Cierre asociado</label>
+            <select name="cierre" class="form-input">
+                <option value="">— Todos —</option>
+                {% for c in cierres_disponibles %}
+                    <option value="{{ c.id }}" {% if filtros.cierre == c.id|stringformat:"s" %}selected{% endif %}>
+                        {{ c.encabezado|truncatechars:60 }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Año archivo</label>
+            <select name="anio" class="form-input">
+                <option value="">— Todos —</option>
+                {% for a in anios %}
+                    <option value="{{ a }}" {% if filtros.anio == a|stringformat:"s" %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label" style="font-size:11px;">Origen</label>
+            <select name="origen" class="form-input">
+                <option value="">— Todos —</option>
+                <option value="interno" {% if filtros.origen == 'interno' %}selected{% endif %}>Interno</option>
+                <option value="externo" {% if filtros.origen == 'externo' %}selected{% endif %}>Externo</option>
+            </select>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a href="{% url 'academia:adicionales_archivados_lista' %}" class="btn btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</div>
+
+{# ─── Tabla ─────────────────────── #}
+<div class="table-wrap">
+    {% if adicionales %}
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Persona</th>
+                <th>Origen</th>
+                <th>Curso / Detalle</th>
+                <th style="text-align:right;">Valor</th>
+                <th>Método / Recibo</th>
+                <th>Archivado en</th>
+                <th>Cierre asociado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ad in adicionales %}
+            <tr>
+                <td style="white-space:nowrap;">
+                    <strong style="color:#1a237e; font-family:monospace;">{{ ad.numero_recibo }}</strong>
+                    <div style="font-size:11px; color:#888;">{{ ad.fecha|date:"d/m/Y" }}</div>
+                </td>
+                <td>{{ ad.tipo_adicional_label }}</td>
+                <td>
+                    <strong>{{ ad.persona_nombre }}</strong>
+                    <div style="font-size:11px; color:#888;">{{ ad.persona_cedula }}</div>
+                </td>
+                <td>
+                    {% if ad.origen_label == 'Estudiante interno' %}
+                        <span style="background:#e8f5e9; color:#2e7d32; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600;">INTERNO</span>
+                    {% elif ad.origen_label == 'Persona externa' %}
+                        <span style="background:#e3f2fd; color:#1a237e; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600;">EXTERNO</span>
+                    {% else %}
+                        <span style="background:#f5f5f5; color:#666; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600;">—</span>
+                    {% endif %}
+                </td>
+                <td style="font-size:12px;">
+                    {{ ad.curso_nombre|default:"—" }}
+                    {% if ad.numero_modulo %}
+                        <div style="color:#f0ad4e;">Mód. {{ ad.numero_modulo }}</div>
+                    {% endif %}
+                    {% if ad.talla_camiseta %}
+                        <div style="color:#888;">Talla {{ ad.talla_camiseta }}</div>
+                    {% endif %}
+                </td>
+                <td style="text-align:right;">
+                    <strong style="color:#2e7d32;">${{ ad.valor|floatformat:2 }}</strong>
+                </td>
+                <td style="font-size:12px;">
+                    {{ ad.metodo_pago_label }}
+                    {% if ad.banco_label %}
+                        <div style="color:#888;">{{ ad.banco_label }}</div>
+                    {% endif %}
+                </td>
+                <td style="font-size:12px; color:#666;">
+                    {{ ad.archivado_en|date:"d/m/Y H:i" }}
+                </td>
+                <td style="font-size:12px;">
+                    {% if ad.cierre %}
+                    <a href="{% url 'academia:cierre_detalle' ad.cierre.pk %}" style="color:#1a237e; text-decoration:none;">
+                        {{ ad.cierre.encabezado|truncatechars:40 }}
+                    </a>
+                    {% else %}
+                    <span style="color:#999; font-style:italic;">Directorio (Huérfano)</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p style="font-size:15px;">No hay adicionales archivados todavía.</p>
+        <p style="font-size:13px; color:#aaa;">
+            Cuando ejecutes un Cierre Global o la opción <strong>"Limpiar directorio"</strong>,
+            los adicionales relacionados aparecerán aquí.
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+{% if count > 300 %}
+<p style="margin-top:14px; color:#888; font-size:12px;">
+    Mostrando los 300 más recientes de {{ count }} totales. Aplica filtros para reducir el listado.
+</p>
+{% endif %}
+
+{% endblock %}
