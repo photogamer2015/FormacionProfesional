@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar archivo mensual{% endblock %}
+
+{% block content %}
+<div class="crumb">
+    <a href="{% url 'academia:bienvenida' %}">Inicio</a> &nbsp;›&nbsp;
+    <a href="{% url 'academia:archivo_index' %}">Archivo</a> &nbsp;›&nbsp;
+    Eliminar {{ etiqueta }}
+</div>
+
+<div class="card-box" style="max-width:680px; border:2px solid #c62828; background:#fff5f5;">
+    <h2 class="page-title" style="color:#c62828;">🗑 Eliminar archivo mensual</h2>
+    <p class="page-subtitle">
+        Vas a eliminar la carpeta <strong>{{ titulo }} · {{ etiqueta }}</strong>.
+    </p>
+
+    <div style="background:white; border-left:4px solid #c62828; border-radius:8px; padding:14px 16px; margin:18px 0;">
+        <strong style="color:#c62828;">Contenido:</strong>
+        <div style="font-size:14px; margin-top:6px;">{{ descripcion }}</div>
+    </div>
+
+    <p style="font-size:13px; color:#555; line-height:1.6;">
+        Esta acción borra definitivamente esos registros archivados. Si necesitas conservar copia,
+        primero exporta el mes a Excel o PDF desde la pantalla de Archivo.
+    </p>
+
+    <form method="post" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        {% csrf_token %}
+        <a href="{% url 'academia:archivo_index' %}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-danger" style="font-weight:700;">
+            Sí, eliminar {{ etiqueta }}
+        </button>
+    </form>
+</div>
+{% endblock %}

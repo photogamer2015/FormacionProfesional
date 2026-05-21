@@ -99,6 +99,27 @@
     }
     .month-link.admin { color: #2e7d32; border-color: #c8e6c9; }
     .month-link.admin:hover { background: #2e7d32; color: white; border-color: #2e7d32; }
+    .month-tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-left: 32px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #ececf4;
+    }
+    .month-tool {
+        font-size: 10.5px;
+        font-weight: 700;
+        text-decoration: none;
+        padding: 4px 8px;
+        border-radius: 7px;
+        border: 1px solid #dfe3ff;
+        background: white;
+        color: #1a237e;
+    }
+    .month-tool.pdf { color:#c62828; border-color:#ffcdd2; }
+    .month-tool.danger { color:#c62828; border-color:#ef9a9a; background:#fff5f5; }
 
     .empty-state {
         text-align: center;
@@ -120,6 +141,7 @@
     body.dark-mode .month-link:hover { background: #1a237e; color: white; border-color: #1a237e; }
     body.dark-mode .month-link.admin { color: #a5d6a7; }
     body.dark-mode .month-link.admin:hover { background: #2e7d32; color: white; }
+    body.dark-mode .month-tool { background:#1e1e1e; border-color:#3a3a3a; }
     body.dark-mode .empty-state { color: #777; }
 </style>
 {% endblock %}
@@ -181,6 +203,22 @@
                                href="{% url c.url_adicional %}?anio={{ m.anio }}&mes={{ m.mes }}">
                                 ➕ Adicionales archivados ({{ m.total_cierres }})
                             </a>
+                        {% endif %}
+                    </div>
+                    <div class="month-tools">
+                        <a class="month-tool"
+                           href="{% url 'academia:archivo_mes_export_excel' c.clave m.anio m.mes %}">
+                            📥 Excel
+                        </a>
+                        <a class="month-tool pdf"
+                           href="{% url 'academia:archivo_mes_export_pdf' c.clave m.anio m.mes %}">
+                            📄 PDF
+                        </a>
+                        {% if es_admin_user %}
+                        <a class="month-tool danger"
+                           href="{% url 'academia:archivo_mes_eliminar' c.clave m.anio m.mes %}">
+                            🗑 Eliminar mes
+                        </a>
                         {% endif %}
                     </div>
                 </div>

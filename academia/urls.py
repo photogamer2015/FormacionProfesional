@@ -228,6 +228,12 @@ urlpatterns = [
 
      path('historial/archivo/',
           views_cierre.archivo_index, name='archivo_index'),
+     path('historial/archivo/<str:categoria>/<int:anio>/<int:mes>/exportar/excel/',
+          views_cierre.archivo_mes_export_excel, name='archivo_mes_export_excel'),
+     path('historial/archivo/<str:categoria>/<int:anio>/<int:mes>/exportar/pdf/',
+          views_cierre.archivo_mes_export_pdf, name='archivo_mes_export_pdf'),
+     path('historial/archivo/<str:categoria>/<int:anio>/<int:mes>/eliminar/',
+          views_cierre.archivo_mes_eliminar, name='archivo_mes_eliminar'),
      path('historial/cierres/',
           views_cierre.cierre_historial, name='cierre_historial'),
      path('historial/cierres/<int:cierre_pk>/',

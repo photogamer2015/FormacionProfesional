@@ -835,6 +835,204 @@ def archivo_index(request):
     })
 
 
+def _categoria_archivo_o_404(categoria):
+    categorias = {
+        'estudiantes': 'Estudiantes',
+        'adicional': 'Adicionales',
+        'administrativo': 'Administrativo',
+    }
+    if categoria not in categorias:
+        raise ValueError('Categoría de archivo no válida.')
+    return categorias[categoria]
+
+
+def _archivo_mes_contexto(categoria, anio, mes):
+    etiqueta = f'{MESES_ES[mes]} {anio}'
+    if categoria == 'estudiantes':
+        cierres = CierreCurso.objects.filter(fecha_cierre__year=anio, fecha_cierre__month=mes)
+        matriculas = MatriculaArchivada.objects.filter(archivado_en__year=anio, archivado_en__month=mes)
+        estudiantes = EstudianteArchivado.objects.filter(archivado_en__year=anio, archivado_en__month=mes)
+        return {
+            'cierres': cierres,
+            'matriculas': matriculas,
+            'estudiantes': estudiantes,
+            'total': cierres.count() + estudiantes.count(),
+            'descripcion': f'{cierres.count()} cierre(s), {matriculas.count()} matrícula(s), {estudiantes.count()} estudiante(s)',
+            'etiqueta': etiqueta,
+        }
+    if categoria == 'adicional':
+        from .models import AdicionalArchivado
+        adicionales = AdicionalArchivado.objects.filter(archivado_en__year=anio, archivado_en__month=mes)
+        return {
+            'adicionales': adicionales,
+            'total': adicionales.count(),
+            'descripcion': f'{adicionales.count()} adicional(es)',
+            'etiqueta': etiqueta,
+        }
+    cortes = CierreAdministrativo.objects.filter(anio=anio, mes=mes)
+    return {
+        'cortes': cortes,
+        'total': cortes.count(),
+        'descripcion': f'{cortes.count()} corte(s) de caja',
+        'etiqueta': etiqueta,
+    }
+
+
+def _validar_mes_archivo(categoria, mes):
+    titulo = _categoria_archivo_o_404(categoria)
+    if not (1 <= int(mes) <= 12):
+        raise ValueError('Mes no válido.')
+    return titulo
+
+
+@matricula_requerida
+def archivo_mes_export_excel(request, categoria, anio, mes):
+    """Exporta una carpeta mensual del archivo a Excel."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+
+    try:
+        titulo = _validar_mes_archivo(categoria, mes)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect('academia:archivo_index')
+    if categoria == 'administrativo' and not (request.user.is_superuser or request.user.groups.filter(name='Administradores').exists()):
+        messages.error(request, 'No tienes permiso para exportar cortes administrativos.')
+        return redirect('academia:archivo_index')
+
+    ctx = _archivo_mes_contexto(categoria, anio, mes)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = titulo[:31]
+    header_fill = PatternFill('solid', fgColor='1A237E')
+    header_font = Font(bold=True, color='FFFFFF')
+
+    def write_table(headers, rows):
+        for col, header in enumerate(headers, start=1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+        for row_idx, row in enumerate(rows, start=2):
+            for col_idx, value in enumerate(row, start=1):
+                ws.cell(row=row_idx, column=col_idx, value=value)
+        for col_idx, header in enumerate(headers, start=1):
+            ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = max(14, min(38, len(header) + 8))
+
+    if categoria == 'estudiantes':
+        rows = []
+        for c in ctx['cierres'].order_by('curso_nombre'):
+            rows.append(['Cierre de curso', c.fecha_cierre.strftime('%d/%m/%Y'), c.encabezado, '', '', f'{c.total_matriculas} matrícula(s)'])
+        for m in ctx['matriculas'].order_by('apellidos', 'nombres'):
+            rows.append(['Matrícula', m.archivado_en.strftime('%d/%m/%Y'), m.curso_nombre, m.cedula, m.nombre_completo, f'Valor ${m.valor_neto} · Pagado ${m.valor_pagado} · Saldo ${m.saldo}'])
+        for e in ctx['estudiantes'].order_by('apellidos', 'nombres'):
+            rows.append(['Estudiante archivado', e.archivado_en.strftime('%d/%m/%Y'), e.cierre.encabezado if e.cierre else '', e.cedula, e.nombre_completo, e.celular or ''])
+        write_table(['Tipo', 'Fecha archivo', 'Curso/Cierre', 'Cédula', 'Persona', 'Detalle'], rows)
+    elif categoria == 'adicional':
+        rows = [[
+            a.archivado_en.strftime('%d/%m/%Y'), a.fecha.strftime('%d/%m/%Y'), a.tipo_adicional_label,
+            a.persona_nombre, a.persona_cedula, a.origen_label, a.curso_nombre, float(a.valor), a.numero_recibo,
+        ] for a in ctx['adicionales'].order_by('-archivado_en', '-fecha')]
+        write_table(['Fecha archivo', 'Fecha cobro', 'Tipo', 'Persona', 'Cédula', 'Origen', 'Curso', 'Valor', 'Recibo'], rows)
+    else:
+        rows = [[c.encabezado, c.fecha_cierre.strftime('%d/%m/%Y %H:%M'), float(c.ingreso_total), float(c.egreso_total), float(c.balance_neto), c.observaciones or ''] for c in ctx['cortes'].order_by('-fecha_cierre')]
+        write_table(['Periodo', 'Fecha cierre', 'Ingresos', 'Egresos', 'Balance', 'Notas'], rows)
+
+    out = BytesIO()
+    wb.save(out)
+    out.seek(0)
+    resp = HttpResponse(out.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = f'attachment; filename="archivo_{categoria}_{anio}_{mes:02d}.xlsx"'
+    return resp
+
+
+@matricula_requerida
+def archivo_mes_export_pdf(request, categoria, anio, mes):
+    """Exporta una carpeta mensual del archivo a PDF."""
+    try:
+        titulo = _validar_mes_archivo(categoria, mes)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect('academia:archivo_index')
+    if categoria == 'administrativo' and not (request.user.is_superuser or request.user.groups.filter(name='Administradores').exists()):
+        messages.error(request, 'No tienes permiso para exportar cortes administrativos.')
+        return redirect('academia:archivo_index')
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+    ctx = _archivo_mes_contexto(categoria, anio, mes)
+    out = BytesIO()
+    doc = SimpleDocTemplate(out, pagesize=landscape(A4), leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24)
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph(f'Archivo {titulo} - {ctx["etiqueta"]}', styles['Title']),
+        Paragraph(ctx['descripcion'], styles['Normal']),
+        Spacer(1, 12),
+    ]
+    if categoria == 'estudiantes':
+        data = [['Tipo', 'Fecha', 'Detalle', 'Cédula', 'Persona']]
+        for c in ctx['cierres'].order_by('curso_nombre'):
+            data.append(['Cierre', c.fecha_cierre.strftime('%d/%m/%Y'), c.encabezado, '', f'{c.total_matriculas} matrícula(s)'])
+        for e in ctx['estudiantes'].order_by('apellidos', 'nombres'):
+            data.append(['Estudiante', e.archivado_en.strftime('%d/%m/%Y'), e.cierre.encabezado if e.cierre else '', e.cedula, e.nombre_completo])
+    elif categoria == 'adicional':
+        data = [['Fecha', 'Tipo', 'Persona', 'Origen', 'Valor']]
+        for a in ctx['adicionales'].order_by('-archivado_en', '-fecha'):
+            data.append([a.archivado_en.strftime('%d/%m/%Y'), a.tipo_adicional_label, a.persona_nombre, a.origen_label, f'${a.valor}'])
+    else:
+        data = [['Periodo', 'Fecha', 'Ingresos', 'Egresos', 'Balance']]
+        for c in ctx['cortes'].order_by('-fecha_cierre'):
+            data.append([c.encabezado, c.fecha_cierre.strftime('%d/%m/%Y'), f'${c.ingreso_total}', f'${c.egreso_total}', f'${c.balance_neto}'])
+    table = Table(data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1A237E')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#DDDDDD')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(table)
+    doc.build(story)
+    out.seek(0)
+    resp = HttpResponse(out.getvalue(), content_type='application/pdf')
+    resp['Content-Disposition'] = f'attachment; filename="archivo_{categoria}_{anio}_{mes:02d}.pdf"'
+    return resp
+
+
+@admin_requerido
+def archivo_mes_eliminar(request, categoria, anio, mes):
+    """Elimina una carpeta mensual completa del archivo."""
+    try:
+        titulo = _validar_mes_archivo(categoria, mes)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect('academia:archivo_index')
+    ctx = _archivo_mes_contexto(categoria, anio, mes)
+    if request.method == 'POST':
+        descripcion = ctx['descripcion']
+        if categoria == 'estudiantes':
+            ctx['cierres'].delete()
+            ctx['estudiantes'].delete()
+        elif categoria == 'adicional':
+            ctx['adicionales'].delete()
+        else:
+            ctx['cortes'].delete()
+        messages.success(request, f'Archivo eliminado: {titulo} · {ctx["etiqueta"]} ({descripcion}).')
+        return redirect('academia:archivo_index')
+    return render(request, 'historial/archivo_mes_confirmar_eliminar.html', {
+        'categoria': categoria,
+        'titulo': titulo,
+        'anio': anio,
+        'mes': mes,
+        'etiqueta': ctx['etiqueta'],
+        'descripcion': ctx['descripcion'],
+        'total': ctx['total'],
+    })
+
+
 @matricula_requerida
 def cierre_historial(request):
     """
