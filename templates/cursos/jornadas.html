@@ -42,9 +42,10 @@
     {% endif %}
 </div>
 
-<div style="display:grid; grid-template-columns: 1fr 2fr; gap: 24px; align-items:start;">
+<div style="display:grid; grid-template-columns:{% if puede_agregar_jornada %} 1fr 2fr{% else %} 1fr{% endif %}; gap: 24px; align-items:start;">
 
     {# ── Panel izquierdo: Agregar nueva jornada ─────────── #}
+    {% if puede_agregar_jornada %}
     <div class="card-box">
         <h3 style="color:#1a237e; margin-bottom:12px; font-size:17px;">+ Nueva jornada</h3>
         <form method="post" style="display:flex; flex-direction:column; gap:12px;">
@@ -90,6 +91,7 @@
             <button type="submit" class="btn btn-primary">Agregar jornada</button>
         </form>
     </div>
+    {% endif %}
 
     {# ── Panel derecho: Listado de jornadas ─────────────── #}
     <div>
@@ -113,7 +115,9 @@
                             <th>Ciudad</th>
                             <th>Estado</th>
                             <th>Mat.</th>
+                            {% if puede_editar_jornada or puede_eliminar_jornada or es_admin %}
                             <th>Acción</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -130,12 +134,15 @@
                                 {% endif %}
                             </td>
                             <td>{{ j.matriculas.count }}</td>
+                            {% if puede_editar_jornada or puede_eliminar_jornada or es_admin %}
                             <td>
                                 <div class="row-actions">
+                                    {% if puede_editar_jornada %}
                                     <button type="button" class="btn btn-warning btn-sm"
                                         onclick="abrirModalEditar('{% url 'academia:jornada_editar' curso.pk j.pk %}', '{{ modalidad_activa }}')">
                                         Editar
                                     </button>
+                                    {% endif %}
                                     {% if es_admin and j.matriculas.count > 0 %}
                                     <a href="{% url 'academia:cierre_preview' curso.pk %}?jornada={{ j.pk }}"
                                        class="btn btn-sm"
@@ -144,14 +151,17 @@
                                         🔒 Cerrar
                                     </a>
                                     {% endif %}
+                                    {% if puede_eliminar_jornada %}
                                     <form method="post" action="{% url 'academia:jornada_eliminar' curso.pk j.pk %}"
                                         onsubmit="return false;">
                                         {% csrf_token %}
                                         <button type="button" class="btn btn-danger btn-sm"
                                             onclick="confirmarAccion(this.closest('form'), '¿Eliminar esta jornada? Si tiene matrículas, se marcará como inactiva.', 'danger')">Eliminar</button>
                                     </form>
+                                    {% endif %}
                                 </div>
                             </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -185,7 +195,9 @@
                             <th>Ciudad</th>
                             <th>Estado</th>
                             <th>Mat.</th>
+                            {% if puede_editar_jornada or puede_eliminar_jornada or es_admin %}
                             <th>Acción</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -202,12 +214,15 @@
                                 {% endif %}
                             </td>
                             <td>{{ j.matriculas.count }}</td>
+                            {% if puede_editar_jornada or puede_eliminar_jornada or es_admin %}
                             <td>
                                 <div class="row-actions">
+                                    {% if puede_editar_jornada %}
                                     <button type="button" class="btn btn-warning btn-sm"
                                         onclick="abrirModalEditar('{% url 'academia:jornada_editar' curso.pk j.pk %}', '{{ modalidad_activa }}')">
                                         Editar
                                     </button>
+                                    {% endif %}
                                     {% if es_admin and j.matriculas.count > 0 %}
                                     <a href="{% url 'academia:cierre_preview' curso.pk %}?jornada={{ j.pk }}"
                                        class="btn btn-sm"
@@ -216,14 +231,17 @@
                                         🔒 Cerrar
                                     </a>
                                     {% endif %}
+                                    {% if puede_eliminar_jornada %}
                                     <form method="post" action="{% url 'academia:jornada_eliminar' curso.pk j.pk %}"
                                         onsubmit="return false;">
                                         {% csrf_token %}
                                         <button type="button" class="btn btn-danger btn-sm"
                                             onclick="confirmarAccion(this.closest('form'), '¿Eliminar esta jornada? Si tiene matrículas, se marcará como inactiva.', 'danger')">Eliminar</button>
                                     </form>
+                                    {% endif %}
                                 </div>
                             </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -351,10 +369,11 @@
 <script>
     // ── Form de NUEVA jornada ──────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function () {
-        const modalidadSelect = document.querySelector('select[name="modalidad"]');
+        const modalidadSelect = document.getElementById('id_modalidad');
         const labelCiudad = document.getElementById('label-ciudad');
 
         function toggleCiudadRequired() {
+            if (!modalidadSelect || !labelCiudad) return;
             if (modalidadSelect && modalidadSelect.value === 'online') {
                 labelCiudad.textContent = 'Sede (Opcional)';
             } else {

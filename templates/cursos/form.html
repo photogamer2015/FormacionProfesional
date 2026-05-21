@@ -286,11 +286,13 @@
                             id="cat-picker-search-clear" title="Limpiar búsqueda">✕</button>
                 </div>
                 <div class="cat-picker-list" id="cat-picker-list"></div>
+                {% if puede_agregar_categorias %}
                 <div class="cat-picker-footer">
                     <button type="button" class="cat-picker-add" id="cat-picker-add">
                         + Nueva categoría
                     </button>
                 </div>
+                {% endif %}
             </div>
         </div>
         {{ form.categoria.errors }}
@@ -385,6 +387,7 @@
 </form>
 
 
+{% if puede_agregar_categorias %}
 <!-- Modal: agregar nueva categoría -->
 <div class="modal-backdrop" id="modal-categoria" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:20px;">
     <div style="background:white; border-radius:12px; width:100%; max-width:480px; padding:28px; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
@@ -422,7 +425,9 @@
         </div>
     </div>
 </div>
+{% endif %}
 
+{% if puede_eliminar_categorias %}
 <!-- Modal: confirmar eliminar categoría -->
 <div class="modal-backdrop" id="modal-confirmar-eliminar" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1001; align-items:center; justify-content:center; padding:20px;">
     <div style="background:white; border-radius:12px; width:100%; max-width:440px; padding:28px; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
@@ -442,6 +447,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}
 
 
@@ -571,10 +577,12 @@
                 <div class="cat-picker-item${sel}" data-id="${c.id}">
                     <span class="cat-picker-dot" style="background:${escapeAttr(c.color)};"></span>
                     <span class="cat-picker-item-name">${escapeHtml(c.nombre)}</span>
+                    {% if puede_eliminar_categorias %}
                     <button type="button" class="cat-picker-item-delete"
                             data-id="${c.id}"
                             data-nombre="${escapeAttr(c.nombre)}"
                             title="Eliminar categoría">🗑</button>
+                    {% endif %}
                 </div>
             `;
         }).join('');
@@ -691,11 +699,15 @@
         modal.style.display = 'none';
     }
 
-    addBtn.addEventListener('click', openModal);
-    document.getElementById('btn-cancel-cat').addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+    if (addBtn && modal) {
+        addBtn.addEventListener('click', openModal);
+        document.getElementById('btn-cancel-cat').addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+    }
 
-    document.getElementById('btn-save-cat').addEventListener('click', async function() {
+    const btnSaveCat = document.getElementById('btn-save-cat');
+    if (btnSaveCat) {
+    btnSaveCat.addEventListener('click', async function() {
         errorBox.style.display = 'none';
         const nombre = inputNombre.value.trim();
         if (!nombre) {
@@ -738,7 +750,9 @@
             this.textContent = 'Guardar';
         }
     });
+    }
 
+    if (modal) {
     modal.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -747,6 +761,7 @@
             closeModal();
         }
     });
+    }
 
     /* ════════════════════════════════════════════════════════════
        MODAL "ELIMINAR CATEGORÍA"
@@ -773,11 +788,14 @@
         categoriaIdAEliminar = null;
     }
 
+    if (btnCancelEliminar && modalEliminar) {
     btnCancelEliminar.addEventListener('click', cerrarConfirmEliminar);
     modalEliminar.addEventListener('click', (e) => {
         if (e.target === modalEliminar) cerrarConfirmEliminar();
     });
+    }
 
+    if (btnConfirmEliminar) {
     btnConfirmEliminar.addEventListener('click', async function() {
         if (!categoriaIdAEliminar) return;
         eliminarError.style.display = 'none';
@@ -812,6 +830,7 @@
             this.textContent = 'Sí, eliminar';
         }
     });
+    }
 
     /* ── Helpers ── */
     function escapeHtml(s) {

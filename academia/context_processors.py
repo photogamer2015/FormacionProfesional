@@ -9,8 +9,14 @@ Uso en plantillas:
 from .permisos import (
     es_admin as _es_admin,
     es_asesor as _es_asesor,
+    puede_agregar_categorias as _puede_agregar_categorias,
+    puede_agregar_cursos as _puede_agregar_cursos,
+    puede_cambiar_cursos as _puede_cambiar_cursos,
     puede_editar_cursos as _puede_editar_cursos,
+    puede_eliminar_categorias as _puede_eliminar_categorias,
+    puede_eliminar_cursos as _puede_eliminar_cursos,
     puede_gestionar_matriculas as _puede_gestionar_matriculas,
+    puede_gestionar_jornadas as _puede_gestionar_jornadas,
 )
 
 
@@ -21,7 +27,13 @@ def roles(request):
             'es_admin': False,
             'es_asesor': False,
             'puede_editar_cursos': False,
+            'puede_agregar_cursos': False,
+            'puede_cambiar_cursos': False,
+            'puede_eliminar_cursos': False,
+            'puede_agregar_categorias': False,
+            'puede_eliminar_categorias': False,
             'puede_gestionar_matriculas': False,
+            'puede_gestionar_jornadas': False,
             'rol_actual': '',
         }
 
@@ -38,7 +50,13 @@ def roles(request):
         'es_admin': es_a,
         'es_asesor': es_s,
         'puede_editar_cursos': _puede_editar_cursos(user),
+        'puede_agregar_cursos': _puede_agregar_cursos(user),
+        'puede_cambiar_cursos': _puede_cambiar_cursos(user),
+        'puede_eliminar_cursos': _puede_eliminar_cursos(user),
+        'puede_agregar_categorias': _puede_agregar_categorias(user),
+        'puede_eliminar_categorias': _puede_eliminar_categorias(user),
         'puede_gestionar_matriculas': _puede_gestionar_matriculas(user),
+        'puede_gestionar_jornadas': _puede_gestionar_jornadas(user),
         'rol_actual': rol_actual,
     }
 

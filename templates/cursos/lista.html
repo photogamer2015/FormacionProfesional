@@ -5,7 +5,7 @@
 {% block readonly_banner %}
 <div class="readonly-banner">
     👁 Estás viendo el catálogo en <strong>modo solo lectura</strong>.
-    Los administradores pueden crear, editar y eliminar cursos.
+    Los administradores pueden crear, editar y eliminar cursos. Las jornadas respetan los permisos asignados.
 </div>
 {% endblock %}
 
@@ -50,15 +50,19 @@
             Total {{ modalidad_label }}: {{ total_cursos }} curso{{ total_cursos|pluralize }}
         </p>
     </div>
-    {% if puede_editar_cursos %}
+    {% if puede_agregar_categorias or puede_agregar_cursos or es_admin %}
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        {% if puede_agregar_categorias %}
         <button type="button" class="btn btn-secondary" id="btn-abrir-modal-cat"
                 style="background:#FFD700; color:#1a237e; border-color:#FFD700; font-weight:700;">
             + Agregar categoría
         </button>
+        {% endif %}
+        {% if puede_agregar_cursos %}
         <a href="{% url 'academia:curso_crear' %}?modalidad={{ modalidad }}" class="btn btn-success">
             + Nuevo curso {{ modalidad_label|lower }}
         </a>
+        {% endif %}
         {% if es_admin %}
         <a href="{% url 'academia:cierre_historial' %}" class="btn btn-secondary"
            title="Ver historial de cierres realizados">
@@ -100,7 +104,7 @@
             <span style="background:#f0f0f0; color:#555; padding:2px 10px; border-radius:12px; font-size:12px; font-weight:600;">
                 {{ cat.total }} curso{{ cat.total|pluralize }}
             </span>
-            {% if puede_editar_cursos %}
+            {% if puede_agregar_cursos %}
             <a href="{% url 'academia:curso_crear' %}?categoria={{ cat.obj.id }}&modalidad={{ modalidad }}"
                class="btn btn-secondary btn-sm" style="margin-left:auto;">
                 + Agregar a {{ cat.obj.nombre }}
@@ -146,13 +150,17 @@
                     {% endif %}
 
                     <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
-                        {% if puede_editar_cursos %}
+                        {% if puede_editar_cursos or puede_gestionar_jornadas %}
+                            {% if puede_gestionar_jornadas %}
                             <a href="{% url 'academia:curso_jornadas' curso.pk %}?modalidad={{ modalidad }}"
                                class="btn btn-secondary btn-sm">
                                 Jornadas ({% if modalidad == 'online' %}{{ curso.jornadas_online_count }}{% else %}{{ curso.jornadas_presencial_count }}{% endif %})
                             </a>
+                            {% endif %}
+                            {% if puede_cambiar_cursos %}
                             <a href="{% url 'academia:curso_editar' curso.pk %}"
                                class="btn btn-warning btn-sm">Editar</a>
+                            {% endif %}
                             {% if es_admin %}
                             <a href="{% url 'academia:cierre_preview' curso.pk %}"
                                class="btn btn-sm"
@@ -161,6 +169,7 @@
                                 🔒 Cierre
                             </a>
                             {% endif %}
+                            {% if puede_eliminar_cursos %}
                             <form method="post" action="{% url 'academia:curso_eliminar' curso.pk %}"
                                   style="display:inline;"
                                   onsubmit="return false;">
@@ -168,6 +177,7 @@
                                 <button type="button" class="btn btn-danger btn-sm"
                                     onclick="confirmarAccion(this.closest('form'), '¿Eliminar el curso «{{ curso.nombre|escapejs }}»? Si tiene matrículas, se marcará como inactivo.', 'danger')">Eliminar</button>
                             </form>
+                            {% endif %}
                         {% else %}
                             {# Asesores: solo ven cuántas jornadas hay, sin enlace #}
                             <span class="btn btn-secondary btn-sm" style="cursor:default; opacity:0.7;">
@@ -189,7 +199,7 @@
 {% if total_cursos == 0 %}
 <div class="empty-state" style="margin-top: 28px; padding: 40px; background:white; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
     <p style="font-size:15px; margin-bottom:8px;">No hay cursos {{ modalidad_label|lower }} todavía.</p>
-    {% if puede_editar_cursos %}
+    {% if puede_agregar_cursos %}
         <p style="font-size:13px; color:#aaa; margin-bottom:16px;">
             Crea uno nuevo, o edita un curso existente y marca la modalidad <strong>{{ modalidad_label|lower }}</strong>.
         </p>
@@ -207,7 +217,7 @@
         {% for curso in sin_categoria %}
             <div class="card-box" style="padding: 18px; border-left: 4px solid #888;">
                 <h4 style="font-size:15px; color:#1a237e;">{{ curso.nombre }}</h4>
-                {% if puede_editar_cursos %}
+                {% if puede_cambiar_cursos %}
                 <a href="{% url 'academia:curso_editar' curso.pk %}" class="btn btn-warning btn-sm" style="margin-top:8px;">Asignar categoría</a>
                 {% endif %}
             </div>
@@ -217,7 +227,7 @@
 {% endif %}
 
 {# ── Modal: agregar nueva categoría ── #}
-{% if puede_editar_cursos %}
+{% if puede_agregar_categorias %}
 <div class="cat-modal-backdrop" id="modal-cat">
     <div class="cat-modal-card">
         <h3 style="color:#1a237e; margin-bottom:16px; font-size:18px;">Nueva categoría</h3>
@@ -268,7 +278,7 @@
 
 
 {% block extra_js %}
-{% if puede_editar_cursos %}
+{% if puede_agregar_categorias %}
 <script>
 (function() {
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;

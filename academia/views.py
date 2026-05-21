@@ -15,7 +15,16 @@ from .forms import (
     JornadaCursoForm, MatriculaForm,
 )
 from .models import Categoria, Curso, Estudiante, JornadaCurso, Matricula, AssistantQueryLog, Sede, EstudianteArchivado, MatriculaArchivada
-from .permisos import admin_requerido, matricula_requerida
+from .permisos import (
+    admin_requerido,
+    jornadas_requeridas,
+    matricula_requerida,
+    permiso_jornada_requerido,
+    permiso_requerido,
+    puede_agregar_jornadas,
+    puede_editar_jornadas,
+    puede_eliminar_jornadas,
+)
 
 
 @login_required
@@ -526,7 +535,7 @@ def cursos_lista(request, modalidad):
     })
 
 
-@admin_requerido
+@permiso_requerido('academia.add_curso', 'No tienes permiso para crear cursos.')
 def curso_crear(request):
     modalidad_pref = request.GET.get('modalidad', 'presencial')
     if modalidad_pref not in MODALIDADES_VALIDAS:
@@ -560,7 +569,7 @@ def curso_crear(request):
     })
 
 
-@admin_requerido
+@permiso_requerido('academia.change_curso', 'No tienes permiso para editar cursos.')
 def curso_editar(request, pk):
     curso = get_object_or_404(Curso, pk=pk)
     if request.method == 'POST':
@@ -581,7 +590,7 @@ def curso_editar(request, pk):
     })
 
 
-@admin_requerido
+@permiso_requerido('academia.delete_curso', 'No tienes permiso para eliminar cursos.')
 @require_POST
 def curso_eliminar(request, pk):
     curso = get_object_or_404(Curso, pk=pk)
@@ -600,13 +609,19 @@ def curso_eliminar(request, pk):
     return redirect('academia:cursos_lista', modalidad=modalidad_redirect)
 
 
-@admin_requerido
+@jornadas_requeridas
 def curso_jornadas(request, pk):
     """Lista jornadas del curso y permite agregar nuevas en la misma pantalla."""
     curso = get_object_or_404(Curso, pk=pk)
     modalidad_activa = request.GET.get('modalidad', 'presencial')
+    puede_agregar = puede_agregar_jornadas(request.user)
     
     if request.method == 'POST':
+        if not puede_agregar:
+            messages.error(request, 'No tienes permiso para agregar jornadas.')
+            from django.urls import reverse
+            return redirect(f"{reverse('academia:curso_jornadas', args=[curso.pk])}?modalidad={modalidad_activa}")
+
         form = JornadaCursoForm(request.POST)
         if form.is_valid():
             jornada = form.save(commit=False)
@@ -630,10 +645,13 @@ def curso_jornadas(request, pk):
         'form': form,
         'modalidad_activa': modalidad_activa,
         'sedes': sedes,
+        'puede_agregar_jornada': puede_agregar,
+        'puede_editar_jornada': puede_editar_jornadas(request.user),
+        'puede_eliminar_jornada': puede_eliminar_jornadas(request.user),
     })
 
 
-@admin_requerido
+@permiso_jornada_requerido('academia.delete_jornadacurso')
 @require_POST
 def jornada_eliminar(request, pk, jornada_pk):
     curso = get_object_or_404(Curso, pk=pk)
@@ -650,7 +668,7 @@ def jornada_eliminar(request, pk, jornada_pk):
     return redirect(f"{reverse('academia:curso_jornadas', args=[curso.pk])}?modalidad={modalidad_jornada}")
 
 
-@admin_requerido
+@permiso_jornada_requerido('academia.change_jornadacurso')
 def jornada_editar(request, pk, jornada_pk):
     """Edita una jornada existente. Acepta POST (form) o GET (devuelve datos JSON para el modal)."""
     curso = get_object_or_404(Curso, pk=pk)
@@ -918,10 +936,10 @@ def api_estudiantes_por_celular(request, celular):
     })
 
 
-@admin_requerido
+@permiso_requerido('academia.add_categoria', 'No tienes permiso para crear categorías.')
 @require_http_methods(['POST'])
 def api_categoria_crear(request):
-    """Crea una categoría desde el modal del form de curso. (Solo admin)"""
+    """Crea una categoría desde el modal del form de curso."""
     try:
         data = json.loads(request.body or '{}')
     except json.JSONDecodeError:
@@ -983,13 +1001,13 @@ def api_categoria_listar(request):
     })
 
 
-@admin_requerido
+@permiso_requerido('academia.delete_categoria', 'No tienes permiso para eliminar categorías.')
 @require_http_methods(['POST'])
 def api_categoria_eliminar(request, pk):
     """
     Elimina una categoría. Si tiene cursos asociados, devuelve 409 (Conflict)
     en lugar de borrar — gracias a `on_delete=PROTECT` en el modelo Curso.
-    Solo administradores pueden borrar.
+    Respeta el permiso `delete_categoria` configurado en Django Admin.
     """
     from django.db.models import ProtectedError
 
